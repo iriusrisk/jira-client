@@ -725,6 +725,11 @@ public final class Field {
                 return JSONNull.getInstance();
             else if (value instanceof TimeTracking)
                 return ((TimeTracking) value).toJsonObject();
+        } else if (m.type.equals("option")) {
+            JSONObject json = new JSONObject();
+            ValueTuple tuple = new ValueTuple("value", value.toString());
+            json.put(tuple.type, tuple.value.toString());
+            return json.toString();
         } else if (m.type.equals("number")) {
             if(!(value instanceof java.lang.Integer) && !(value instanceof java.lang.Double) && !(value 
                     instanceof java.lang.Float) && !(value instanceof java.lang.Long) )
