@@ -20,6 +20,7 @@
 package net.rcarz.jiraclient;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -1071,6 +1072,53 @@ public class Issue extends Resource {
         return projects.get(0).getIssueTypes().get(0).getFields();
     }
 
+    public static JSONObject getCreateMetadataNEW(
+            RestClient restclient, String project, String issueType) throws JiraException {
+
+        // Check server info
+        ServerInfo serverInfo = ServerInfo.get(restclient);
+        boolean isJiraServerV9 = serverInfo.getDeploymentType().equalsIgnoreCase("Server") && serverInfo.getVersionNumbers().get(0) >= 9;
+
+        if (isJiraServerV9) {
+            JSON result = null;
+            try {
+                result = restclient.get(Resource.getBaseUri() + "issue/createmeta/" + project + "/issuetypes");
+            } catch (RestException | IOException | URISyntaxException e) {
+                throw new JiraException("No issue types found", e);
+            }
+
+            JSONObject jo = (JSONObject)result;
+            JSONArray values = jo.getJSONArray("values");
+            Optional<Object> optIssueTypeFound = values.stream().filter(item -> ((JSONObject)item).getString("name").equalsIgnoreCase(issueType)).findFirst();
+            if (!optIssueTypeFound.isPresent()) {
+                throw new JiraException("No issue type found");
+            }
+
+            String issueTypeId = ((JSONObject)optIssueTypeFound.get()).getString("id");
+
+            result = null;
+            try {
+                result = restclient.get(Resource.getBaseUri() + "issue/createmeta/" + project + "/issuetypes/" + issueTypeId);
+            } catch (RestException | IOException | URISyntaxException e) {
+                throw new JiraException("No issue meta fields found", e);
+            }
+
+            if (!(result instanceof JSONObject))
+                throw new JiraException("JSON payload is malformed");
+
+            jo = (JSONObject)result;
+            values = jo.getJSONArray("values");
+            JSONObject metaFields = new JSONObject();
+            values.forEach(item -> {
+                metaFields.put(((JSONObject)item).getString("fieldId"), item);
+            });
+
+            return metaFields;
+        }
+
+        return getCreateMetadata(restclient, project, issueType);
+    }
+
     private JSONObject getEditMetadata() throws JiraException {
         JSON result = null;
 
@@ -1344,9 +1392,15 @@ public class Issue extends Resource {
     public static FluentCreate create(RestClient restclient, String project, String issueType, String serverType)
         throws JiraException {
 
+        return create(restclient, getCreateMetadata(restclient, project, issueType), project, issueType, serverType);
+    }
+
+    public static FluentCreate create(RestClient restclient, JSONObject createMetadata,
+                                      String project, String issueType, String serverType) {
+
         FluentCreate fc = new FluentCreate(
             restclient,
-            getCreateMetadata(restclient, project, issueType),
+                createMetadata,
             serverType);
 
         return fc
@@ -1354,8 +1408,8 @@ public class Issue extends Resource {
             .field(Field.ISSUE_TYPE, issueType);
     }
 
-    public static FluentCreateComposed createBulk(RestClient restclient,JSONObject createmetadata, String project,
-                                                  String issueType, String serverType)
+    public static FluentCreateComposed createBulk(RestClient restclient, JSONObject createmetadata,
+                                                  String project, String issueType, String serverType)
             throws JiraException {
 
         return new FluentCreateComposed(

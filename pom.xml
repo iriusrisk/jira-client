@@ -3,7 +3,7 @@
 
   <groupId>net.rcarz</groupId>
   <artifactId>jira-client</artifactId>
-  <version>0.9.0-IRIUS</version>
+  <version>0.9.1-IRIUS-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>jira-client</name>
@@ -22,6 +22,19 @@
     <url>https://github.com/continuumsecurity/jira-client</url>
     <connection>https://github.com/continuumsecurity/jira-client</connection>
   </scm>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <source>8</source>
+          <target>8</target>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 
   <parent>
     <groupId>org.sonatype.oss</groupId>

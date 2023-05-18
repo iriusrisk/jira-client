@@ -125,6 +125,11 @@ public class JiraClient {
         return Issue.create(restclient, project, issueType, serverType);
     }
 
+    public Issue.FluentCreate createIssue(JSONObject createmeta, String project, String issueType, String serverType) {
+
+        return Issue.create(restclient, createmeta, project, issueType, serverType);
+    }
+
     /**
      * Creates a list of new issues in the given project.
      *
@@ -139,7 +144,7 @@ public class JiraClient {
                                                    String serverType)
             throws JiraException {
 
-        return Issue.createBulk(restclient,createmeta, project, issueType, serverType);
+        return Issue.createBulk(restclient, createmeta, project, issueType, serverType);
     }
 
     /**
