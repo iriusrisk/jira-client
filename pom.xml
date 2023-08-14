@@ -38,12 +38,12 @@
     <snapshotRepository>
       <id>nexus</id>
       <name>Releases</name>
-      <url>http://localhost:9092/repository/maven-snapshots</url>
+      <url>${repository.url}/maven-snapshots</url>
     </snapshotRepository>
     <repository>
       <id>nexus</id>
       <name>Releases</name>
-      <url>http://localhost:9092/repository/maven-releases</url>
+      <url>${repository.url}/maven-releases</url>
     </repository>
   </distributionManagement>
 
