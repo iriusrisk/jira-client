@@ -726,7 +726,7 @@ public final class Field {
             else if (value instanceof ValueTuple) {
                 ValueTuple tuple = (ValueTuple) value;
                 json.put(tuple.type, tuple.value.toString());
-            } else if (m.name.equalsIgnoreCase("reporter") && ServerInfo.CLOUD.equalsIgnoreCase(serverType))
+            } else if (isReporterOrIssueType(m, serverType))
                 json.put(ValueType.ID_NUMBER.toString(), value.toString());
             else
                 json.put(ValueType.NAME.toString(), value.toString());
@@ -792,6 +792,9 @@ public final class Field {
         }
 
         throw new UnsupportedOperationException(m.type + " is not a supported field type");
+    }
+    private static boolean isReporterOrIssueType(Meta m, String serverType) {
+        return (m.name.equalsIgnoreCase("reporter") && ServerInfo.CLOUD.equalsIgnoreCase(serverType)) || m.type.equalsIgnoreCase("issuetype");
     }
 
     /**

@@ -1112,7 +1112,7 @@ public class Issue extends Resource {
             Map<String, String> params = new HashMap<String, String>();
             params.put("expand", "projects.issuetypes.fields");
             params.put("projectKeys", pval);
-            params.put("issuetypeNames", itval);
+            params.put("issuetypeIds", itval);
             URI createuri = restclient.buildURI(
                 getBaseUri() + "issue/createmeta",
                 params);
