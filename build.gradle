@@ -28,7 +28,7 @@ dependencies {
     implementation "org.apache.httpcomponents:httpclient:4.5.13"
     implementation "org.apache.httpcomponents:httpmime:4.2.5"
     implementation "net.sf.json-lib:json-lib:2.4:jdk15"
-    implementation 'joda-time:joda-time:2.3'
+    implementation "joda-time:joda-time:2.3"
 
     testImplementation "junit:junit:4.8.2"
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.1.0"
