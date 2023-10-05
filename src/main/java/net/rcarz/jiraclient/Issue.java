@@ -19,16 +19,24 @@
 
 package net.rcarz.jiraclient;
 
+import net.sf.json.JSON;
+import net.sf.json.JSONArray;
+import net.sf.json.JSONObject;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.*;
-
-import net.sf.json.JSON;
-import net.sf.json.JSONArray;
-import net.sf.json.JSONObject;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 
 /**
  * Represents a JIRA issue.
@@ -1035,45 +1043,18 @@ public class Issue extends Resource {
 
     public static JSONObject getCreateMetadata(RestClient restclient,
                                                String project,
-                                               String issueType) throws JiraException {
+                                               String issueTypeId) throws JiraException {
         if (isJiraServerV9(restclient)) {
-            String issueTypeId = getIssueTypeIdV9(restclient, project, issueType);
             return getCreateMetadataV9(restclient, project, issueTypeId);
         }
 
-        return getCreateMetadataV8(restclient, project, issueType);
+        return getCreateMetadataV8(restclient, project, issueTypeId);
     }
 
     private static boolean isJiraServerV9(RestClient restclient) throws JiraException {
         ServerInfo serverInfo = ServerInfo.get(restclient);
         return serverInfo.getDeploymentType().equalsIgnoreCase("Server") &&
                serverInfo.getVersionNumbers().get(0) >= 9;
-    }
-
-    private static String getIssueTypeIdV9(RestClient restclient,
-                                           String project,
-                                           String issueType) throws JiraException {
-        JSON jsonIssueTypes;
-        try {
-            URI uri = restclient.buildURI(Resource.getBaseUri() + "issue/createmeta/" + project + "/issuetypes",
-                                          Collections.singletonMap("maxResults", MAX_RESULTS));
-            jsonIssueTypes = restclient.get(uri);
-        } catch (RestException | IOException | URISyntaxException e) {
-            throw new JiraException("No issue types found", e);
-        }
-
-        JSONObject jsonObjectIssueTypes = (JSONObject) jsonIssueTypes;
-        JSONArray values = jsonObjectIssueTypes.getJSONArray("values");
-
-        Optional<Object> issueTypeFound = values.stream()
-                .filter(item -> ((JSONObject)item).getString("name").equalsIgnoreCase(issueType))
-                .findFirst();
-
-        if (!issueTypeFound.isPresent()) {
-            throw new JiraException("No issue type found");
-        }
-
-        return ((JSONObject)issueTypeFound.get()).getString("id");
     }
 
     private static JSONObject getCreateMetadataV9(RestClient restclient,
@@ -1102,10 +1083,10 @@ public class Issue extends Resource {
 
     private static JSONObject getCreateMetadataV8(RestClient restclient,
                                                  String project,
-                                                 String issueType) throws JiraException {
+                                                 String issueTypeId) throws JiraException {
 
         final String pval = project;
-        final String itval = issueType;
+        final String itval = issueTypeId;
         JSON result = null;
 
         try {
@@ -1136,7 +1117,7 @@ public class Issue extends Resource {
             restclient);
 
         if (projects.isEmpty() || projects.get(0).getIssueTypes().isEmpty())
-            throw new JiraException("Project '"+ project + "'  or issue type '" + issueType +
+            throw new JiraException("Project '"+ project + "'  or issue type id '" + issueTypeId +
                     "' missing from create metadata. Do you have enough permissions?");
 
         return projects.get(0).getIssueTypes().get(0).getFields();
