@@ -1,5 +1,17 @@
-/*
- * Copyright (c) 2012-2023 IriusRisk SL. All rights reserved
- */
-
+pluginManagement {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        maven {
+            url = uri('https://maven.pkg.github.com/iriusrisk/repositories')
+            credentials {
+                username = System.getenv('GITHUB_USERNAME') ?: getProperty('github.username')
+                password = System.getenv('GITHUB_PASSWORD') ?: getProperty('github.password')
+            }
+        }
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+}
 rootProject.name = 'jira-client'
