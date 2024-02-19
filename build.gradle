@@ -5,7 +5,8 @@
 plugins {
     id 'groovy'
     id 'maven-publish'
-    id "org.sonarqube" version "3.0"
+    id("org.sonarqube") version "4.0.0.2929"
+    id 'auth-gradle-plugin' version '1.1.4'
 }
 
 ext {
@@ -17,21 +18,17 @@ group 'net.rcarz'
 sourceCompatibility = 1.8
 
 repositories {
-    mavenLocal()
-    maven {
-        allowInsecureProtocol true
-        url "http://localhost:9092/repository/iriusrisk-central/"
-    }
+    mavenCentral()
 }
 
 dependencies {
     implementation "org.apache.httpcomponents:httpclient:4.5.13"
     implementation "org.apache.httpcomponents:httpmime:4.2.5"
-    compile "net.sf.json-lib:json-lib:2.4:jdk15"
+    implementation "net.sf.json-lib:json-lib:2.4:jdk15"
     implementation "joda-time:joda-time:2.3"
 
     testImplementation "junit:junit:4.8.2"
-    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.1.0"
+    testImplementation "org.junit.jupiter:junit-jupiter-engine:5.1.0"
     testImplementation "org.powermock:powermock-module-junit4:1.6.3"
     testImplementation "org.powermock:powermock-api-mockito:1.6.3"
     testImplementation "org.codehaus.groovy:groovy-all:2.4.6"
@@ -48,16 +45,14 @@ publishing {
             from components.java
         }
     }
-    repositories {
-        maven {
-            allowInsecureProtocol true
-            name 'nexus'
-            url = version.endsWith('SNAPSHOT') ? iriusriskNexusRepositorySnapshotsUrl : iriusriskNexusRepositoryReleasesUrl
-            credentials {
-                username nexusRepositoryUsername
-                password nexusRepositoryPassword
-            }
-        }
+}
+
+aws {
+    active = true // 'false' by default.
+    codeartifact {
+        domain = 'iriusrisk' // AWS maven domain.
+        repoName = 'maven' // AWS maven repository name, multiple repositories may belong to the same domain.
+        publish = true // Optional, to publish the artifact to the remote repository, 'false' by default.
     }
 }
 
