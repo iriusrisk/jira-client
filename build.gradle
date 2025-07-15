@@ -3,7 +3,7 @@
  */
 
 plugins {
-    id 'groovy'
+    id 'java'
     id 'maven-publish'
     id("org.sonarqube") version "4.0.0.2929"
     id 'auth-gradle-plugin' version '1.1.4'
@@ -22,16 +22,15 @@ repositories {
 }
 
 dependencies {
-    implementation "org.apache.httpcomponents:httpclient:4.5.13"
+    implementation "org.apache.httpcomponents:httpclient:4.5.14"
     implementation "org.apache.httpcomponents:httpmime:4.2.5"
     implementation "net.sf.json-lib:json-lib:2.4:jdk15"
     implementation "joda-time:joda-time:2.3"
 
-    testImplementation "junit:junit:4.8.2"
-    testImplementation "org.junit.jupiter:junit-jupiter-engine:5.1.0"
+    testImplementation "org.junit.jupiter:junit-jupiter-engine:5.9.3"
+    testImplementation "org.junit.vintage:junit-vintage-engine:5.9.3"
     testImplementation "org.powermock:powermock-module-junit4:1.6.3"
     testImplementation "org.powermock:powermock-api-mockito:1.6.3"
-    testImplementation "org.codehaus.groovy:groovy-all:2.4.6"
 
 }
 
@@ -60,7 +59,6 @@ publish {
     group 'iriusrisk'
     description 'recompiles the library and send to our artifacts repository'
     dependsOn clean, build
-    test.onlyIf { false }
 }
 
 if (jacocoEnabled.toBoolean()) {
