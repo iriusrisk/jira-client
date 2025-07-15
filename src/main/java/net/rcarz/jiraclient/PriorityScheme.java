@@ -36,7 +36,7 @@ public class PriorityScheme extends Resource {
 
     public void deserialise(JsonNode json) {
         self = Field.getString(json.get("self"));
-        id = Field.getString(json.get("id").toString());
+        id = Field.getString(json.get("id"));
         prioritiesIds = Field.getStringArray(json.get("optionIds"));
         description = Field.getString(json.get("description"));
         name = Field.getString(json.get("name"));
