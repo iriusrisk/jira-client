@@ -165,11 +165,11 @@ public final class Field {
      *
      * @return a boolean primitive or false if b isn't a Boolean instance
      */
-    public static boolean getBoolean(Object b) {
+    public static boolean getBoolean(JsonNode b) {
         boolean result = false;
 
-        if (b instanceof Boolean)
-            result = ((Boolean) b).booleanValue();
+        if (b != null && b.isBoolean())
+            result = b.asBoolean();
 
         return result;
     }
