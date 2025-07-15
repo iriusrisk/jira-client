@@ -1,6 +1,8 @@
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSONObject;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import org.junit.Test;
 import org.powermock.api.mockito.PowerMockito;
 
@@ -31,15 +33,15 @@ public class IssueTypeTest {
 
     @Test
     public void testFields() throws Exception {
-        final JSONObject testJSON = getTestJSON();
-        final JSONObject fields = new JSONObject();
+        final ObjectNode testJSON = getTestJSON();
+        final ObjectNode fields = JsonNodeFactory.instance.objectNode();
         fields.put("key1","key1Value");
         fields.put("key2","key2Value");
-        testJSON.put("fields", fields);
+        testJSON.set("fields", fields);
         IssueType issueType = new IssueType(null, testJSON);
         assertEquals(2,issueType.getFields().size());
-        assertSame("key1Value",issueType.getFields().getString("key1"));
-        assertSame("key2Value",issueType.getFields().getString("key2"));
+        assertSame("key1Value",issueType.getFields().get("key1").asText());
+        assertSame("key2Value",issueType.getFields().get("key2").asText());
 
     }
 
@@ -76,8 +78,8 @@ public class IssueTypeTest {
         assertEquals(issueType.toString(),"Story");
     }
 
-    private JSONObject getTestJSON() {
-        JSONObject jsonObject = new JSONObject();
+    private ObjectNode getTestJSON() {
+        ObjectNode jsonObject = JsonNodeFactory.instance.objectNode();
 
         jsonObject.put("self", "https://brainbubble.atlassian.net/rest/api/2/issuetype/7");
         jsonObject.put("id", "7");

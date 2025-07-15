@@ -1,5 +1,9 @@
 package net.rcarz.jiraclient;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.NullNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
@@ -9,9 +13,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
-
-import net.sf.json.JSON;
-import net.sf.json.JSONNull;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -150,7 +151,7 @@ public class IssueTest {
         Issue issue = new Issue(restClient, Utils.getTestIssue());
         issue.addRemoteLink("test-url", "test-title", "test-summary");
         assertEquals("/rest/api/latest/issue/FILTA-43/remotelink", restClient.postPath);
-        assertEquals("{\"object\":{\"url\":\"test-url\",\"title\":\"test-title\",\"summary\":\"test-summary\"}}", restClient.postPayload.toString(0));
+        assertEquals("{\"object\":{\"url\":\"test-url\",\"title\":\"test-title\",\"summary\":\"test-summary\"}}", restClient.postPayload.toString());
     }
 
 
@@ -182,7 +183,7 @@ public class IssueTest {
                         "\"status\":{\"resolved\":\"true\",\"icon\":" +
                             "{\"title\":\"status-title\",\"url16x16\":\"status-icon\",\"link\":\"status-url\"}" +
                 "}}}",
-                restClient.postPayload.toString(0));
+                restClient.postPayload.toString());
     }
 
     @Test
@@ -200,7 +201,7 @@ public class IssueTest {
     private static class TestableRestClient extends RestClient {
 
         public String postPath = "not called";
-        public JSON postPayload = JSONNull.getInstance();
+        public JsonNode postPayload = NullNode.getInstance();
 
         public TestableRestClient() {
             super(null, null);
@@ -211,7 +212,7 @@ public class IssueTest {
         }
 
         @Override
-        public JSON post(String path, JSON payload) {
+        public JsonNode post(String path, ObjectNode payload) {
             postPath = path;
             postPayload = payload;
             return null;

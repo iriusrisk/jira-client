@@ -3,10 +3,7 @@
  */
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSON;
-import net.sf.json.JSONObject;
-
-import java.util.List;
+import com.fasterxml.jackson.databind.JsonNode;
 
 public class ProjectPriorityScheme extends PriorityScheme {
 
@@ -16,7 +13,7 @@ public class ProjectPriorityScheme extends PriorityScheme {
      * @param restclient REST client instance
      * @param json JSON payload
      */
-    public ProjectPriorityScheme(RestClient restclient, JSONObject json) {
+    public ProjectPriorityScheme(RestClient restclient, JsonNode json) {
         super(restclient, json);
 
         if (json != null)
@@ -36,7 +33,7 @@ public class ProjectPriorityScheme extends PriorityScheme {
     public static PriorityScheme get(RestClient restclient, String project)
             throws JiraException {
 
-        JSON result = null;
+        JsonNode result = null;
 
         try {
             result = restclient.get(getBaseUri() + "project/" + project + "/priorityscheme");
@@ -44,9 +41,10 @@ public class ProjectPriorityScheme extends PriorityScheme {
             throw new JiraException("Failed to retrieve property scheme on project " + project, ex);
         }
 
-        if (!(result instanceof JSONObject))
+        if (result == null || !result.isObject()) {
             throw new JiraException("JSON payload is malformed");
+        }
 
-        return new PriorityScheme(restclient, (JSONObject)result);
+        return new PriorityScheme(restclient, result);
     }
 }

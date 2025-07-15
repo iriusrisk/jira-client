@@ -19,10 +19,8 @@
 
 package net.rcarz.jiraclient;
 
-import java.util.Map;
-
-import net.sf.json.JSON;
-import net.sf.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Represents an issue link type.
@@ -39,21 +37,21 @@ public class LinkType extends Resource {
      * @param restclient REST client instance
      * @param json JSON payload
      */
-    protected LinkType(RestClient restclient, JSONObject json) {
+    private static final ObjectMapper mapper = new ObjectMapper();
+
+    protected LinkType(RestClient restclient, JsonNode json) {
         super(restclient);
 
         if (json != null)
             deserialise(json);
     }
 
-    private void deserialise(JSONObject json) {
-        Map map = json;
-
-        self = Field.getString(map.get("self"));
-        id = Field.getString(map.get("id"));
-        name = Field.getString(map.get("name"));
-        inward = Field.getString(map.get("inward"));
-        outward = Field.getString(map.get("outward"));
+    private void deserialise(JsonNode json) {
+        self = Field.getString(json.get("self"));
+        id = Field.getString(json.get("id"));
+        name = Field.getString(json.get("name"));
+        inward = Field.getString(json.get("inward"));
+        outward = Field.getString(json.get("outward"));
     }
 
     /**
@@ -69,7 +67,7 @@ public class LinkType extends Resource {
     public static LinkType get(RestClient restclient, String id)
         throws JiraException {
 
-        JSON result = null;
+        JsonNode result = null;
 
         try {
             result = restclient.get(getBaseUri() + "issueLinkType/" + id);
@@ -77,10 +75,11 @@ public class LinkType extends Resource {
             throw new JiraException("Failed to retrieve issue link type " + id, ex);
         }
 
-        if (!(result instanceof JSONObject))
+        if (result == null || !result.isObject()) {
             throw new JiraException("JSON payload is malformed");
+        }
 
-        return new LinkType(restclient, (JSONObject)result);
+        return new LinkType(restclient, result);
     }
 
     @Override

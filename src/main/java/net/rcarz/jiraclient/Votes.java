@@ -19,10 +19,7 @@
 
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSON;
-import net.sf.json.JSONObject;
-
-import java.util.Map;
+import com.fasterxml.jackson.databind.JsonNode;
 
 /**
  * Represents issue votes.
@@ -38,20 +35,18 @@ public class Votes extends Resource {
      * @param restclient REST client instance
      * @param json JSON payload
      */
-    protected Votes(RestClient restclient, JSONObject json) {
+    protected Votes(RestClient restclient, JsonNode json) {
         super(restclient);
 
         if (json != null)
             deserialise(json);
     }
 
-    private void deserialise(JSONObject json) {
-        Map map = json;
-
-        self = Field.getString(map.get("self"));
-        id = Field.getString(map.get("id"));
-        votes = Field.getInteger(map.get("votes"));
-        hasVoted = Field.getBoolean(map.get("hasVoted"));
+    private void deserialise(JsonNode json) {
+        self = Field.getString(json.get("self"));
+        id = Field.getString(json.get("id"));
+        votes = Field.getInteger(json.get("votes"));
+        hasVoted = Field.getBoolean(json.get("hasVoted"));
     }
 
     /**
@@ -67,7 +62,7 @@ public class Votes extends Resource {
     public static Votes get(RestClient restclient, String issue)
         throws JiraException {
 
-        JSON result = null;
+        JsonNode result = null;
 
         try {
             result = restclient.get(getBaseUri() + "issue/" + issue + "/votes");
@@ -75,10 +70,11 @@ public class Votes extends Resource {
             throw new JiraException("Failed to retrieve votes for issue " + issue, ex);
         }
 
-        if (!(result instanceof JSONObject))
+        if (result == null || !result.isObject()) {
             throw new JiraException("JSON payload is malformed");
+        }
 
-        return new Votes(restclient, (JSONObject)result);
+        return new Votes(restclient, result);
     }
 
     @Override

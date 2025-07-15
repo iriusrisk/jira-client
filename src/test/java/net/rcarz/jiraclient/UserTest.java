@@ -1,6 +1,8 @@
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSONObject;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import org.junit.Test;
 import org.powermock.api.mockito.PowerMockito;
 
@@ -42,8 +44,8 @@ public class UserTest {
         assertTrue(user.isActive());
     }
 
-    private JSONObject getTestJSON() {
-        JSONObject json = new JSONObject();
+    private ObjectNode getTestJSON() {
+        ObjectNode json = JsonNodeFactory.instance.objectNode();
 
         json.put("name", username);
         json.put("email", email);
@@ -51,13 +53,13 @@ public class UserTest {
         json.put("displayName", displayName);
         json.put("self", self);
 
-        JSONObject images = new JSONObject();
+        ObjectNode images = JsonNodeFactory.instance.objectNode();
         images.put("16x16", "https://secure.gravatar.com/avatar/a5a271f9eee8bbb3795f41f290274f8c?d=mm&s=16");
         images.put("24x24", "https://secure.gravatar.com/avatar/a5a271f9eee8bbb3795f41f290274f8c?d=mm&s=24");
         images.put("32x32", "https://secure.gravatar.com/avatar/a5a271f9eee8bbb3795f41f290274f8c?d=mm&s=32");
         images.put("48x48", "https://secure.gravatar.com/avatar/a5a271f9eee8bbb3795f41f290274f8c?d=mm&s=48");
 
-        json.put("avatarUrls", images);
+        json.set("avatarUrls", images);
         json.put("id", "10");
 
         return json;

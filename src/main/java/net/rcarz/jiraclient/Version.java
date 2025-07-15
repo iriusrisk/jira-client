@@ -19,13 +19,13 @@
 
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSON;
-import net.sf.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Map;
 
 /**
  * Represents a product version.
@@ -45,7 +45,7 @@ public class Version extends Resource {
          * The JSON request that will be built incrementally as fluent methods
          * are invoked.
          */
-        JSONObject req = new JSONObject();
+        ObjectNode req = JsonNodeFactory.instance.objectNode();
 
         /**
          * Creates a new fluent.
@@ -118,7 +118,7 @@ public class Version extends Resource {
          * @throws JiraException when the create fails
          */
         public Version execute() throws JiraException {
-            JSON result = null;
+            JsonNode result = null;
 
             try {
                 result = restclient.post(getRestUri(null), req);
@@ -126,12 +126,11 @@ public class Version extends Resource {
                 throw new JiraException("Failed to create version", ex);
             }
 
-            if (!(result instanceof JSONObject) || !((JSONObject) result).containsKey("id")
-                    || !(((JSONObject) result).get("id") instanceof String)) {
+            if (result == null || !result.isObject() || !result.has("id") || !result.get("id").isTextual()) {
                 throw new JiraException("Unexpected result on create version");
             }
 
-            return new Version(restclient, (JSONObject) result);
+            return new Version(restclient, result);
         }
     }
 
@@ -147,7 +146,7 @@ public class Version extends Resource {
      * @param restclient REST client instance
      * @param json       JSON payload
      */
-    protected Version(RestClient restclient, JSONObject json) {
+    protected Version(RestClient restclient, JsonNode json) {
         super(restclient);
 
         if (json != null)
@@ -162,7 +161,7 @@ public class Version extends Resource {
      */
     public void mergeWith(Version version) throws JiraException {
     
-        JSONObject req = new JSONObject();
+        ObjectNode req = JsonNodeFactory.instance.objectNode();
         req.put("description", version.getDescription());
         req.put("name", version.getName());
         req.put("archived", version.isArchived());
@@ -184,7 +183,7 @@ public class Version extends Resource {
     */
     public void copyTo(Project project) throws JiraException {
     
-        JSONObject req = new JSONObject();
+        ObjectNode req = JsonNodeFactory.instance.objectNode();
         req.put("description", getDescription());
         req.put("name", getName());
         req.put("archived", isArchived());
@@ -211,7 +210,7 @@ public class Version extends Resource {
     public static Version get(RestClient restclient, String id)
             throws JiraException {
 
-        JSON result = null;
+        JsonNode result = null;
 
         try {
             result = restclient.get(getBaseUri() + "version/" + id);
@@ -219,22 +218,20 @@ public class Version extends Resource {
             throw new JiraException("Failed to retrieve version " + id, ex);
         }
 
-        if (!(result instanceof JSONObject))
+        if (result == null || !result.isObject())
             throw new JiraException("JSON payload is malformed");
 
-        return new Version(restclient, (JSONObject) result);
+        return new Version(restclient, result);
     }
 
-    private void deserialise(JSONObject json) {
-        Map map = json;
-
-        self = Field.getString(map.get("self"));
-        id = Field.getString(map.get("id"));
-        name = Field.getString(map.get("name"));
-        archived = Field.getBoolean(map.get("archived"));
-        released = Field.getBoolean(map.get("released"));
-        releaseDate = Field.getString(map.get("releaseDate"));
-        description = Field.getString(map.get("description"));
+    private void deserialise(JsonNode json) {
+        self = Field.getString(json.get("self"));
+        id = Field.getString(json.get("id"));
+        name = Field.getString(json.get("name"));
+        archived = Field.getBoolean(json.get("archived"));
+        released = Field.getBoolean(json.get("released"));
+        releaseDate = Field.getString(json.get("releaseDate"));
+        description = Field.getString(json.get("description"));
     }
 
     @Override

@@ -19,8 +19,7 @@
 
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSONObject;
-import java.util.Map;
+import com.fasterxml.jackson.databind.JsonNode;
 
 /**
  * Represents an issue priority.
@@ -29,7 +28,7 @@ public class Transition extends Resource {
 
     private String name = null;
     private Status toStatus = null;
-    private Map fields = null;
+    private JsonNode fields = null;
 
     /**
      * Creates a priority from a JSON payload.
@@ -37,22 +36,22 @@ public class Transition extends Resource {
      * @param restclient REST client instance
      * @param json JSON payload
      */
-    protected Transition(RestClient restclient, JSONObject json) {
+    protected Transition(RestClient restclient, JsonNode json) {
         super(restclient);
 
         if (json != null)
             deserialise(json);
     }
 
-    private void deserialise(JSONObject json) {
-        Map map = json;
+    private void deserialise(JsonNode json) {
+        self = Field.getString(json.get("self"));
+        id = Field.getString(json.get("id"));
+        name = Field.getString(json.get("name"));
+        toStatus = Field.getResource(Status.class, json.get(Field.TRANSITION_TO_STATUS), restclient);
 
-        self = Field.getString(map.get("self"));
-        id = Field.getString(map.get("id"));
-        name = Field.getString(map.get("name"));
-        toStatus = Field.getResource(Status.class, map.get(Field.TRANSITION_TO_STATUS), restclient);
-
-        fields = (Map)map.get("fields");
+        if (json.has("fields") && json.get("fields").isObject()) {
+            fields = json.get("fields");
+        }
     }
 
     @Override
@@ -68,7 +67,7 @@ public class Transition extends Resource {
         return toStatus;
     }
 
-    public Map getFields() {
+    public JsonNode getFields() {
         return fields;
     }
 

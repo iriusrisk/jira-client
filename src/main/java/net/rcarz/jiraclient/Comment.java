@@ -19,7 +19,11 @@
 
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSON;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import net.sf.json.JSONObject;
 
 import java.util.Date;
@@ -29,6 +33,8 @@ import java.util.Map;
  * Represents an issue comment.
  */
 public class Comment extends Resource {
+
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private String issueKey = null;
     private User author = null;
@@ -43,7 +49,7 @@ public class Comment extends Resource {
      * @param restclient REST client instance
      * @param json JSON payload
      */
-    protected Comment(RestClient restclient, JSONObject json, String issueKey) {
+    protected Comment(RestClient restclient, JsonNode json, String issueKey) {
         super(restclient);
 
         this.issueKey = issueKey;
@@ -51,16 +57,14 @@ public class Comment extends Resource {
             deserialise(json);
     }
 
-    private void deserialise(JSONObject json) {
-        Map map = json;
-
-        self = Field.getString(map.get("self"));
-        id = Field.getString(map.get("id"));
-        author = Field.getResource(User.class, map.get("author"), restclient);
-        body = Field.getString(map.get("body"));
-        created = Field.getDateTime(map.get("created"));
-        updated = Field.getDateTime(map.get("updated"));
-        updatedAuthor = Field.getResource(User.class, map.get("updatedAuthor"), restclient);
+    private void deserialise(JsonNode json) {
+        self = Field.getString(json.get("self"));
+        id = Field.getString(json.get("id"));
+        author = Field.getResource(User.class, json.get("author"), restclient);
+        body = Field.getString(json.get("body"));
+        created = Field.getDateTime(json.get("created"));
+        updated = Field.getDateTime(json.get("updated"));
+        updatedAuthor = Field.getResource(User.class, json.get("updatedAuthor"), restclient);
     }
 
     /**
@@ -77,18 +81,19 @@ public class Comment extends Resource {
     public static Comment get(RestClient restclient, String issue, String id)
         throws JiraException {
 
-        JSON result = null;
+        JsonNode result;
 
         try {
-            result = restclient.get(getBaseUri() + "issue/" + issue + "/comment/" + id);
+            result = objectMapper.readTree(restclient.get(getBaseUri() + "issue/" + issue + "/comment/" + id).toString());
         } catch (Exception ex) {
             throw new JiraException("Failed to retrieve comment " + id + " on issue " + issue, ex);
         }
 
-        if (!(result instanceof JSONObject))
+        if (result == null || !result.isObject()) {
             throw new JiraException("JSON payload is malformed");
+        }
 
-        return new Comment(restclient, (JSONObject)result, issue);
+        return new Comment(restclient, result, issue);
     }
 
     /**
@@ -116,31 +121,31 @@ public class Comment extends Resource {
     public void update(String body, String visType, String visName)
         throws JiraException {
 
-        JSONObject req = new JSONObject();
+        ObjectNode req = JsonNodeFactory.instance.objectNode();
         req.put("body", body);
 
         if (visType != null && visName != null) {
-            JSONObject vis = new JSONObject();
+            ObjectNode vis = JsonNodeFactory.instance.objectNode();
             vis.put("type", visType);
             vis.put("value", visName);
 
-            req.put("visibility", vis);
+            req.set("visibility", vis);
         }
 
-        JSON result = null;
+        JsonNode result;
 
         try {
             String issueUri = getBaseUri() + "issue/" + issueKey;
             result = restclient.put(issueUri + "/comment/" + id, req);
         } catch (Exception ex) {
-            throw new JiraException("Failed add update comment " + id, ex);
+            throw new JiraException("Failed to update comment " + id, ex);
         }
 
-        if (!(result instanceof JSONObject)) {
+        if (result == null || !result.isObject()) {
             throw new JiraException("JSON payload is malformed");
         }
 
-        deserialise((JSONObject) result);
+        deserialise(result);
     }
 
     @Override
@@ -168,4 +173,3 @@ public class Comment extends Resource {
         return updated;
     }
 }
-
