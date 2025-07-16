@@ -13,8 +13,6 @@ public class TimeTrackingTest {
 
   @Test
   public void testAttributeMappings() {
-/* TODO: Review after Issue changes!
-
     Issue issue = new Issue(null, Utils.getTestIssue());
     TimeTracking time = issue.getTimeTracking();
     assertEquals("1w", time.getOriginalEstimate());
@@ -25,9 +23,7 @@ public class TimeTrackingTest {
 
     assertEquals("3d", time.getTimeSpent());
     assertEquals(86400, time.getTimeSpentSeconds());
-*/
   }
-
 
   @Test
   public void testCreateTimeTracking() {
@@ -39,7 +35,6 @@ public class TimeTrackingTest {
     testJson.put("originalEstimateSeconds", 12);
     testJson.put("remainingEstimateSeconds", 10);
     testJson.put("timeSpentSeconds", 14);
-
 
     TimeTracking timeTracking = new TimeTracking(testJson);
     assertEquals("1 day", timeTracking.getOriginalEstimate());
@@ -133,7 +128,6 @@ public class TimeTrackingTest {
     testJson.put("remainingEstimate", "2 days");
     testJson.put("originalEstimateSeconds", 12);
     testJson.put("remainingEstimateSeconds", 10);
-
 
     TimeTracking timeTracking = new TimeTracking(testJson);
     final JsonNode jsonObject = timeTracking.toJsonObject();

@@ -389,7 +389,7 @@ public final class Field {
             } else if (type == CustomFieldOption.class) {
                 result = (T) new CustomFieldOption(restclient, r);
             } else if (type == Issue.class) {
-                // TODO: result = (T) new Issue(restclient, r);
+                result = (T) new Issue(restclient, r);
             } else if (type == IssueLink.class) {
                 result = (T) new IssueLink(restclient, r);
             } else if (type == IssueType.class) {
