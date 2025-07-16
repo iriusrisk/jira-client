@@ -36,12 +36,13 @@ public class IssueTest {
         String statusID = "10004";
         String description = "Issue is currently in progress.";
         String iconURL = "https://brainbubble.atlassian.net/images/icons/statuses/open.png";
+        String summary = "Maintain Company Details";
 
         Issue issue = new Issue(null, Utils.getTestIssue());
+        assertEquals(issue.getField(Field.SUMMARY), summary);
         assertNotNull(issue.getStatus());
         assertEquals(description, issue.getStatus().getDescription());
         assertEquals(iconURL, issue.getStatus().getIconUrl());
-
         assertEquals(statusName, issue.getStatus().getName());
         assertEquals(statusID, issue.getStatus().getId());
     }

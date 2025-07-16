@@ -47,6 +47,7 @@ import java.util.NoSuchElementException;
 public class Issue extends Resource {
 
     private static final String MAX_RESULTS = "1000000";
+    private static final ObjectMapper mapper = new ObjectMapper();
 
     /**
      * Used to chain fields to a create action.
@@ -682,10 +683,8 @@ public class Issue extends Resource {
 
             ObjectNode fieldmap = JsonNodeFactory.instance.objectNode();
 
-            ObjectMapper objectMapper = new ObjectMapper();
-
             for (Map.Entry<String, Object> ent : fields.entrySet()) {
-                JsonNode valNode = objectMapper.valueToTree(ent.getValue());
+                JsonNode valNode = mapper.valueToTree(ent.getValue());
                 fieldmap.set(ent.getKey(), valNode);
             }
 
@@ -1041,6 +1040,8 @@ public class Issue extends Resource {
         if (jsonFields == null || jsonFields.isNull())
             return;
 
+        fields = mapper.convertValue(jsonFields, Map.class);
+
         assignee      = Field.getResource(User.class, jsonFields.get(Field.ASSIGNEE), restclient);
         attachments   = Field.getResourceArray(Attachment.class, jsonFields.get(Field.ATTACHMENT), restclient);
         changeLog     = Field.getResource(ChangeLog.class, json.get(Field.CHANGE_LOG), restclient);
@@ -1154,7 +1155,7 @@ public class Issue extends Resource {
         }
 
         JsonNode projectsNode = result.get("projects");
-        if (projectsNode == null || !projectsNode.isArray()) {
+        if (projectsNode == null || projectsNode.isNull() || !projectsNode.isArray()) {
             throw new JiraException("Create metadata is malformed");
         }
 
@@ -1186,7 +1187,7 @@ public class Issue extends Resource {
 
         JsonNode fieldsNode = result.get("fields");
 
-        if (fieldsNode == null || !fieldsNode.isObject()) {
+        if (fieldsNode == null || fieldsNode.isNull() || !fieldsNode.isObject()) {
             throw new JiraException("Edit metadata is malformed");
         }
 
@@ -1212,7 +1213,7 @@ public class Issue extends Resource {
 
         JsonNode transitionsNode = result.get("transitions");
 
-        if (transitionsNode == null || !transitionsNode.isArray()) {
+        if (transitionsNode == null || transitionsNode.isNull() || !transitionsNode.isArray()) {
             throw new JiraException("Transition metadata is missing.");
         }
 
