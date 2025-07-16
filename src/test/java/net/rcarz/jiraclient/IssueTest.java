@@ -4,23 +4,20 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.junit.Assert;
+import org.junit.Test;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
 
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.junit.Assert;
-import org.junit.Test;
-
-import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.mock;
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 
 public class IssueTest {
 
@@ -198,6 +195,48 @@ public class IssueTest {
         }
     }
 
+    @Test
+    public void testDelete() throws Exception {
+        final TestableDeleteRestClient deleteRestClient = new TestableDeleteRestClient();
+
+        Issue issue = new Issue(deleteRestClient, Utils.getTestIssue());
+
+        Assert.assertTrue(issue.delete(true));
+        Assert.assertNotNull(deleteRestClient.getLastDeleteUri());
+        Assert.assertEquals("http://localhost/dummy", deleteRestClient.getLastDeleteUri().toString());
+    }
+
+    private static class TestableDeleteRestClient extends TestableRestClient {
+        private URI lastDeleteUri = null;
+
+        public TestableDeleteRestClient() {
+            super(null);
+        }
+
+        public TestableDeleteRestClient(URI uri) {
+            super(uri);
+        }
+
+        @Override
+        public JsonNode delete(URI uri) {
+            this.lastDeleteUri = uri;
+            return null;
+        }
+
+        public URI getLastDeleteUri() {
+            return lastDeleteUri;
+        }
+
+        @Override
+        public URI buildURI(String path, Map<String, String> params) {
+            try {
+                return new URI("http://localhost/dummy");
+            } catch (URISyntaxException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
     private static class TestableRestClient extends RestClient {
 
         public String postPath = "not called";
@@ -218,18 +257,5 @@ public class IssueTest {
             return null;
         }
 
-    }
-
-    /**
-     * false is bu default so we test positive case only
-     */
-    @Test
-    public void testDelete() throws Exception {
-        RestClient restClient = mock(RestClient.class);
-        URI uri = new URI("DUMMY");
-        when(restClient.buildURI(anyString(), any(Map.class))).thenReturn(uri);
-        when(restClient.delete(eq(uri))).thenReturn(null);
-        Issue issue = new Issue(restClient, Utils.getTestIssue());
-        Assert.assertTrue(issue.delete(true));
     }
 }

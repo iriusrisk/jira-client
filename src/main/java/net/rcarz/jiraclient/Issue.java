@@ -19,9 +19,12 @@
 
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSON;
-import net.sf.json.JSONArray;
-import net.sf.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 
 import java.io.File;
 import java.io.IOException;
@@ -50,14 +53,14 @@ public class Issue extends Resource {
      */
 
     public static final class FluentCreateComposed {
-        List<IssueFields> issuesTocreate = new ArrayList<IssueFields>();
+        List<IssueFields> issuesTocreate = new ArrayList<>();
         RestClient restclient = null;
-        JSONObject createmeta = null;
+        JsonNode createmeta = null;
         String project = null;
         String issueType = null;
         String serverType = null;
 
-        private FluentCreateComposed(RestClient restclient, JSONObject createmeta, String project, String issueType,
+        private FluentCreateComposed(RestClient restclient, JsonNode createmeta, String project, String issueType,
                                      String serverType) {
             this.restclient = restclient;
             this.createmeta = createmeta;
@@ -80,28 +83,28 @@ public class Issue extends Resource {
          */
         public Results execute() throws JiraException {
 
-            JSONObject req = new JSONObject();
-            JSONArray issueList = new JSONArray();
+            ObjectNode req = JsonNodeFactory.instance.objectNode();
+            ArrayNode issueList = JsonNodeFactory.instance.arrayNode();
             for(IssueFields issueTocreate : issuesTocreate){
-                JSONObject issue = new JSONObject();
-                JSONObject fieldmap = new JSONObject();
+                ObjectNode issue = JsonNodeFactory.instance.objectNode();
+                ObjectNode fieldmap = JsonNodeFactory.instance.objectNode();
 
-                if (issueTocreate.fields.size() == 0) {
+                if (issueTocreate.fields.isEmpty()) {
                     throw new JiraException("No fields were given for create");
                 }
 
                 for (Map.Entry<String, Object> ent : issueTocreate.fields.entrySet()) {
-                    Object newval = Field.toJson(ent.getKey(), ent.getValue(), createmeta, serverType);
-                    fieldmap.put(ent.getKey(), newval);
+                    JsonNode newval = Field.toJson(ent.getKey(), ent.getValue(), createmeta, serverType);
+                    fieldmap.set(ent.getKey(), newval);
                 }
 
-                issue.put("fields", fieldmap);
+                issue.set("fields", fieldmap);
                 issueList.add(issue);
 
             }
-            req.put("issueUpdates",issueList);
+            req.set("issueUpdates",issueList);
 
-            JSON result = null;
+            JsonNode result = null;
 
             try {
                 result = restclient.post(getRestUriBulk(), req);
@@ -109,57 +112,81 @@ public class Issue extends Resource {
                 throw new JiraException("Failed to create issue", ex);
             }
 
-            if (!(result instanceof JSONObject) || !((JSONObject) result).containsKey("issues")
-                    || !(((JSONObject) result).get("issues") instanceof JSONArray)) {
+            if (result == null
+                    || !result.isObject()
+                    || !result.has("issues")
+                    || !result.get("issues").isArray()) {
                 throw new JiraException("Unexpected result on create issue");
             }
 
-            Results results =  new Results();
-            JSONArray errors = ((JSONObject) result).getJSONArray("errors");
-            for(int i = 0; i< errors.size(); i++){
-                JSONObject failed = errors.getJSONObject(i);
-                IssueFields issueFields = issuesTocreate.get(errors.getJSONObject(i).getInt("failedElementNumber"));
-                results.failed.add(parseFailed((String) issueFields.fields.get(Field.SUMMARY), failed));
-                issuesTocreate.remove(issueFields);
+            Results results = new Results();
 
+            JsonNode errorsNode = result.get("errors");
+            if (errorsNode != null && errorsNode.isArray()) {
+                for (JsonNode failed : errorsNode) {
+                    int failedElementNumber = failed.get("failedElementNumber").asInt();
+                    IssueFields issueFields = issuesTocreate.get(failedElementNumber);
+
+                    results.failed.add(
+                            parseFailed(
+                                    (String) issueFields.fields.get(Field.SUMMARY),
+                                    failed
+                            )
+                    );
+                    issuesTocreate.remove(issueFields);
+                }
             }
 
-            JSONArray issues = ((JSONObject) result).getJSONArray("issues");
-            for(int i = 0; i< issues.size(); i++){
-                results.created.add(parseCreated((String) issuesTocreate.get(i).fields.get(Field.SUMMARY), issues.getJSONObject(i)));
+            JsonNode issuesNode = result.get("issues");
+            if (issuesNode != null && issuesNode.isArray()) {
+                for (int i = 0; i < issuesNode.size(); i++) {
+                    JsonNode createdIssue = issuesNode.get(i);
+
+                    results.created.add(
+                            parseCreated(
+                                    (String) issuesTocreate.get(i).fields.get(Field.SUMMARY),
+                                    createdIssue
+                            )
+                    );
+                }
             }
+
             return results;
         }
-
-
     }
 
-    protected static  ResultCreated parseCreated(String name, JSONObject object){
-        return new ResultCreated(object.getString("key"), name);
+    protected static ResultCreated parseCreated(String name, JsonNode object) {
+        return new ResultCreated(object.get("key").asText(), name);
     }
 
-    protected static  ResultFailed parseFailed(String name, JSONObject object){
-        List<String> messages = new ArrayList<String>();
-        JSONObject objectError = object.getJSONObject("elementErrors");
+    protected static ResultFailed parseFailed(String name, JsonNode object) {
+        List<String> messages = new ArrayList<>();
 
+        JsonNode objectError = object.get("elementErrors");
 
-        JSONArray errorMessages = objectError.getJSONArray("errorMessages");
-        for(int i = 0; i < errorMessages.size(); i++){
-            errorMessages.add(errorMessages.getString(i));
+        JsonNode errorMessages = objectError.get("errorMessages");
+        if (errorMessages != null && errorMessages.isArray()) {
+            for (JsonNode msg : errorMessages) {
+                messages.add(msg.asText());
+            }
         }
 
-        JSONObject errorsDetailed = objectError.getJSONObject("errors");
-        for (Object key : errorsDetailed.keySet()){
-            messages.add(key+" -> "+errorsDetailed.getString((String)key));
+        JsonNode errorsDetailed = objectError.get("errors");
+        if (errorsDetailed != null && errorsDetailed.isObject()) {
+            Iterator<String> fieldNames = errorsDetailed.fieldNames();
+            while (fieldNames.hasNext()) {
+                String key = fieldNames.next();
+                String value = errorsDetailed.get(key).asText();
+                messages.add(key + " -> " + value);
+            }
         }
 
-
-        return new ResultFailed(name, object.getInt("status"), messages);
+        return new ResultFailed(name, object.get("status").asInt(), messages);
     }
 
     public static final class Results{
-        List<ResultCreated> created = new ArrayList<ResultCreated>();
-        List<ResultFailed> failed = new ArrayList<ResultFailed>();
+        List<ResultCreated> created = new ArrayList<>();
+        List<ResultFailed> failed = new ArrayList<>();
 
         public List<ResultCreated> getCreated() {
             return created;
@@ -213,23 +240,22 @@ public class Issue extends Resource {
     }
 
     public static final class IssueFields{
-        Map<String, Object> fields = new HashMap<String, Object>();
+        Map<String, Object> fields = new HashMap<>();
 
         public IssueFields field(String name, Object value) {
             fields.put(name, value);
             return this;
         }
-
     }
 
     public static final class FluentCreate {
 
-        Map<String, Object> fields = new HashMap<String, Object>();
+        Map<String, Object> fields = new HashMap<>();
         RestClient restclient = null;
-        JSONObject createmeta = null;
+        JsonNode createmeta = null;
         String serverType = null;
 
-        private FluentCreate(RestClient restclient, JSONObject createmeta, String serverType) {
+        private FluentCreate(RestClient restclient, JsonNode createmeta, String serverType) {
             this.restclient = restclient;
             this.createmeta = createmeta;
             this.serverType = serverType;
@@ -279,21 +305,21 @@ public class Issue extends Resource {
          * @throws JiraException when the create fails
          */
         private Issue executeCreate(String includedFields) throws JiraException {
-            JSONObject fieldmap = new JSONObject();
+            ObjectNode fieldmap = JsonNodeFactory.instance.objectNode();
 
-            if (fields.size() == 0) {
+            if (fields.isEmpty()) {
                 throw new JiraException("No fields were given for create");
             }
 
             for (Map.Entry<String, Object> ent : fields.entrySet()) {
-                Object newval = Field.toJson(ent.getKey(), ent.getValue(), createmeta, serverType);
-                fieldmap.put(ent.getKey(), newval);
+                JsonNode newval = Field.toJson(ent.getKey(), ent.getValue(), createmeta, serverType);
+                fieldmap.set(ent.getKey(), newval);
             }
 
-            JSONObject req = new JSONObject();
-            req.put("fields", fieldmap);
+            ObjectNode req = JsonNodeFactory.instance.objectNode();
+            req.set("fields", fieldmap);
 
-            JSON result = null;
+            JsonNode result = null;
 
             try {
                 result = restclient.post(getRestUri(null), req);
@@ -301,15 +327,16 @@ public class Issue extends Resource {
                 throw new JiraException("Failed to create issue", ex);
             }
 
-            if (!(result instanceof JSONObject) || !((JSONObject) result).containsKey("key")
-                    || !(((JSONObject) result).get("key") instanceof String)) {
+            if (result == null || !result.isObject()
+                    || !result.has("key")
+                    || !result.get("key").isTextual()) {
                 throw new JiraException("Unexpected result on create issue");
             }
 
             if (includedFields != null) {
-                return Issue.get(restclient, (String) ((JSONObject) result).get("key"), includedFields);
+                return Issue.get(restclient, result.get("key").asText(), includedFields);
             } else {
-                return Issue.get(restclient, (String) ((JSONObject) result).get("key"));
+                return Issue.get(restclient, result.get("key").asText());
             }
         }
 
@@ -336,15 +363,15 @@ public class Issue extends Resource {
 
         final private RestClient restclient;
         final private String key;
-        final private JSONObject request;
-        final private JSONObject object;
+        final private ObjectNode request;
+        final private ObjectNode object;
 
 
         private FluentRemoteLink(final RestClient restclient, String key) {
             this.restclient = restclient;
             this.key = key;
-            request = new JSONObject();
-            object = new JSONObject();
+            request = JsonNodeFactory.instance.objectNode();
+            object = JsonNodeFactory.instance.objectNode();
         }
 
 
@@ -391,10 +418,10 @@ public class Issue extends Resource {
          * @return this instance
          */
         public FluentRemoteLink icon(final String url, final String title) {
-            final JSONObject icon = new JSONObject();
+            final ObjectNode icon = JsonNodeFactory.instance.objectNode();
             icon.put("url16x16", url);
             icon.put("title", title);
-            object.put("icon", icon);
+            object.set("icon", icon);
             return this;
         }
 
@@ -408,18 +435,23 @@ public class Issue extends Resource {
          * @return this instance
          */
         public FluentRemoteLink status(final boolean resolved, final String iconUrl, final String title, final String statusUrl) {
-            final JSONObject status = new JSONObject();
+            final ObjectNode status = JsonNodeFactory.instance.objectNode();
             status.put("resolved", Boolean.toString(resolved));
-            final JSONObject icon = new JSONObject();
+
+            final ObjectNode icon = JsonNodeFactory.instance.objectNode();
             icon.put("title", title);
+
             if (iconUrl != null) {
                 icon.put("url16x16", iconUrl);
             }
+
             if (statusUrl != null) {
                 icon.put("link", statusUrl);
             }
-            status.put("icon", icon);
-            object.put("status", status);
+
+            status.set("icon", icon);
+            object.set("status", status);
+
             return this;
         }
 
@@ -456,12 +488,15 @@ public class Issue extends Resource {
          * @return this instance
          */
         public FluentRemoteLink application(final String type, final String name) {
-            final JSONObject application = new JSONObject();
+            final ObjectNode application = JsonNodeFactory.instance.objectNode();
+
             if (type != null) {
                 application.put("type", type);
             }
+
             application.put("name", name);
-            request.put("application", application);
+            request.set("application", application);
+
             return this;
         }
 
@@ -473,7 +508,7 @@ public class Issue extends Resource {
          */
         public void create() throws JiraException {
             try {
-                request.put("object", object);
+                request.set("object", object);
                 restclient.post(getRestUri(key) + "/remotelink", request);
             } catch (Exception ex) {
                 throw new JiraException("Failed add remote link to issue " + key, ex);
@@ -494,11 +529,11 @@ public class Issue extends Resource {
      * @throws JiraException when the search fails
      */
     public static int count(RestClient restclient, String jql) throws JiraException {
-        final String j = jql;
-        JSON result = null;
+        JsonNode result = null;
+
         try {
-            Map<String, String> queryParams = new HashMap<String, String>();
-            queryParams.put("jql", j);
+            Map<String, String> queryParams = new HashMap<>();
+            queryParams.put("jql", jql);
             queryParams.put("maxResults", "1");
             URI searchUri = restclient.buildURI(getBaseUri() + "search", queryParams);
             result = restclient.get(searchUri);
@@ -506,11 +541,12 @@ public class Issue extends Resource {
             throw new JiraException("Failed to search issues", ex);
         }
 
-        if (!(result instanceof JSONObject)) {
+        if (result == null || !result.isObject()) {
             throw new JiraException("JSON payload is malformed");
         }
-        Map map = (Map) result;
-        return Field.getInteger(map.get("total"));
+
+        JsonNode totalNode = result.get("total");
+        return Field.getInteger(totalNode);
     }
 
     /**
@@ -518,11 +554,11 @@ public class Issue extends Resource {
      */
     public final class FluentUpdate {
 
-        Map<String, Object> fields = new HashMap<String, Object>();
-        Map<String, List> fieldOpers = new HashMap<String, List>();
-        JSONObject editmeta = null;
+        Map<String, Object> fields = new HashMap<>();
+        Map<String, List> fieldOpers = new HashMap<>();
+        JsonNode editmeta = null;
 
-        private FluentUpdate(JSONObject editmeta) {
+        private FluentUpdate(JsonNode editmeta) {
             this.editmeta = editmeta;
         }
 
@@ -532,29 +568,29 @@ public class Issue extends Resource {
          * @throws JiraException when the update fails
          */
         public void execute() throws JiraException {
-            JSONObject fieldmap = new JSONObject();
-            JSONObject updatemap = new JSONObject();
+            ObjectNode fieldmap = JsonNodeFactory.instance.objectNode();
+            ObjectNode updatemap = JsonNodeFactory.instance.objectNode();
 
-            if (fields.size() == 0 && fieldOpers.size() == 0)
+            if (fields.isEmpty() && fieldOpers.isEmpty())
                 throw new JiraException("No fields were given for update");
 
             for (Map.Entry<String, Object> ent : fields.entrySet()) {
-                Object newval = Field.toJson(ent.getKey(), ent.getValue(), editmeta);
-                fieldmap.put(ent.getKey(), newval);
+                JsonNode newval = Field.toJson(ent.getKey(), ent.getValue(), editmeta);
+                fieldmap.set(ent.getKey(), newval);
             }
 
             for (Map.Entry<String, List> ent : fieldOpers.entrySet()) {
-                Object newval = Field.toJson(ent.getKey(), ent.getValue(), editmeta);
-                updatemap.put(ent.getKey(), newval);
+                JsonNode newval = Field.toJson(ent.getKey(), ent.getValue(), editmeta);
+                updatemap.set(ent.getKey(), newval);
             }
 
-            JSONObject req = new JSONObject();
+            ObjectNode req = JsonNodeFactory.instance.objectNode();
 
-            if (fieldmap.size() > 0)
-                req.put("fields", fieldmap);
+            if (!fieldmap.isEmpty())
+                req.set("fields", fieldmap);
 
-            if (updatemap.size() > 0)
-                req.put("update", updatemap);
+            if (!updatemap.isEmpty())
+                req.set("update", updatemap);
 
             try {
                 restclient.put(getRestUri(key), req);
@@ -614,7 +650,7 @@ public class Issue extends Resource {
      */
     public final class FluentTransition {
 
-        Map<String, Object> fields = new HashMap<String, Object>();
+        Map<String, Object> fields = new HashMap<>();
         List<Transition> transitions = null;
 
         private FluentTransition(List<Transition> transitions) {
@@ -644,21 +680,24 @@ public class Issue extends Resource {
             if (trans == null || trans.getFields() == null)
                 throw new JiraException("Transition is missing fields");
 
-            JSONObject fieldmap = new JSONObject();
+            ObjectNode fieldmap = JsonNodeFactory.instance.objectNode();
+
+            ObjectMapper objectMapper = new ObjectMapper();
 
             for (Map.Entry<String, Object> ent : fields.entrySet()) {
-                fieldmap.put(ent.getKey(), ent.getValue());
+                JsonNode valNode = objectMapper.valueToTree(ent.getValue());
+                fieldmap.set(ent.getKey(), valNode);
             }
 
-            JSONObject req = new JSONObject();
+            ObjectNode req = JsonNodeFactory.instance.objectNode();
 
-            if (fieldmap.size() > 0)
-                req.put("fields", fieldmap);
+            if (!fieldmap.isEmpty())
+                req.set("fields", fieldmap);
 
-            JSONObject t = new JSONObject();
-            t.put("id", Field.getString(trans.getId()));
+            ObjectNode t = JsonNodeFactory.instance.objectNode();
+            t.set("id", TextNode.valueOf(trans.getId()));
 
-            req.put("transition", t);
+            req.set("transition", t);
 
             try {
                 restclient.post(getRestUri(key) + "/transitions", req);
@@ -783,6 +822,7 @@ public class Issue extends Resource {
             // first call
             if (currentPage == null) {
                 currentPage = getNextIssues().iterator();
+
                 if (currentPage == null || !currentPage.hasNext()) {
                     return null;
                 } else {
@@ -813,12 +853,12 @@ public class Issue extends Resource {
          */
         private List<Issue> getNextIssues() throws JiraException {
             if (issues == null && startAt == null) {
-                startAt = Integer.valueOf(0);
+                startAt = 0;
             } else if (issues != null) {
                 startAt = startAt + issues.size();
             }
 
-            JSON result = null;
+            JsonNode result = null;
 
             try {
                 URI searchUri = createSearchURI(restclient, jql, includedFields,
@@ -828,17 +868,15 @@ public class Issue extends Resource {
                 throw new JiraException("Failed to search issues", ex);
             }
 
-            if (!(result instanceof JSONObject)) {
+            if (result == null || !result.isObject()) {
                 throw new JiraException("JSON payload is malformed");
             }
 
-            
-            Map map = (Map) result;
-    
-            this.startAt = Field.getInteger(map.get("startAt"));
-            this.maxResults = Field.getInteger(map.get("maxResults"));
-            this.total = Field.getInteger(map.get("total"));
-            this.issues = Field.getResourceArray(Issue.class, map.get("issues"), restclient);
+            this.startAt = Field.getInteger(result.get("startAt"));
+            this.maxResults = Field.getInteger(result.get("maxResults"));
+            this.total = Field.getInteger(result.get("total"));
+            this.issues = Field.getResourceArray(Issue.class, result.get("issues"), restclient);
+
             return issues;
         }
     }
@@ -929,9 +967,11 @@ public class Issue extends Resource {
             if (filename == null) {
                 throw new NullPointerException("filename may not be null");
             }
-            if (filename.length() == 0) {
+
+            if (filename.isEmpty()) {
                 throw new IllegalArgumentException("filename may not be empty");
             }
+
             return filename;
         }
 
@@ -984,53 +1024,52 @@ public class Issue extends Resource {
      * @param restclient REST client instance
      * @param json JSON payload
      */
-    protected Issue(RestClient restclient, JSONObject json) {
+    protected Issue(RestClient restclient, JsonNode json) {
         super(restclient);
 
         if (json != null)
             deserialise(json);
     }
 
-    private void deserialise(JSONObject json) {
-        Map map = json;
+    private void deserialise(JsonNode json) {
+        id = Field.getString(json.get("id"));
+        self = Field.getString(json.get("self"));
+        key = Field.getString(json.get("key"));
 
-        id = Field.getString(map.get("id"));
-        self = Field.getString(map.get("self"));
-        key = Field.getString(map.get("key"));
+        JsonNode jsonFields = json.get("fields");
 
-        fields = (Map)map.get("fields");
-        if (fields == null)
+        if (jsonFields == null || jsonFields.isNull())
             return;
 
-        assignee = Field.getResource(User.class, fields.get(Field.ASSIGNEE), restclient);
-        attachments = Field.getResourceArray(Attachment.class, fields.get(Field.ATTACHMENT), restclient);
-        changeLog = Field.getResource(ChangeLog.class, map.get(Field.CHANGE_LOG), restclient);
-        comments = Field.getComments(fields.get(Field.COMMENT), restclient, key);
-        components = Field.getResourceArray(Component.class, fields.get(Field.COMPONENTS), restclient);
-        description = Field.getString(fields.get(Field.DESCRIPTION));
-        dueDate = Field.getDate(fields.get(Field.DUE_DATE));
-        fixVersions = Field.getResourceArray(Version.class, fields.get(Field.FIX_VERSIONS), restclient);
-        issueLinks = Field.getResourceArray(IssueLink.class, fields.get(Field.ISSUE_LINKS), restclient);
-        issueType = Field.getResource(IssueType.class, fields.get(Field.ISSUE_TYPE), restclient);
-        labels = Field.getStringArray(fields.get(Field.LABELS));
-        parent = Field.getResource(Issue.class, fields.get(Field.PARENT), restclient);
-        priority = Field.getResource(Priority.class, fields.get(Field.PRIORITY), restclient);
-        project = Field.getResource(Project.class, fields.get(Field.PROJECT), restclient);
-        reporter = Field.getResource(User.class, fields.get(Field.REPORTER), restclient);
-        resolution = Field.getResource(Resolution.class, fields.get(Field.RESOLUTION), restclient);
-        resolutionDate = Field.getDateTime(fields.get(Field.RESOLUTION_DATE));
-        status = Field.getResource(Status.class, fields.get(Field.STATUS), restclient);
-        subtasks = Field.getResourceArray(Issue.class, fields.get(Field.SUBTASKS), restclient);
-        summary = Field.getString(fields.get(Field.SUMMARY));
-        timeTracking = Field.getTimeTracking(fields.get(Field.TIME_TRACKING));
-        versions = Field.getResourceArray(Version.class, fields.get(Field.VERSIONS), restclient);
-        votes = Field.getResource(Votes.class, fields.get(Field.VOTES), restclient);
-        watches = Field.getResource(Watches.class, fields.get(Field.WATCHES), restclient);
-        workLogs = Field.getWorkLogs(fields.get(Field.WORKLOG), restclient);
-        timeEstimate = Field.getInteger(fields.get(Field.TIME_ESTIMATE));
-        timeSpent = Field.getInteger(fields.get(Field.TIME_SPENT));
-        createdDate = Field.getDateTime(fields.get(Field.CREATED_DATE));
-        updatedDate = Field.getDateTime(fields.get(Field.UPDATED_DATE));
+        assignee      = Field.getResource(User.class, jsonFields.get(Field.ASSIGNEE), restclient);
+        attachments   = Field.getResourceArray(Attachment.class, jsonFields.get(Field.ATTACHMENT), restclient);
+        changeLog     = Field.getResource(ChangeLog.class, json.get(Field.CHANGE_LOG), restclient);
+        comments      = Field.getComments(jsonFields.get(Field.COMMENT), restclient, key);
+        components    = Field.getResourceArray(Component.class, jsonFields.get(Field.COMPONENTS), restclient);
+        description   = Field.getString(jsonFields.get(Field.DESCRIPTION));
+        dueDate       = Field.getDate(jsonFields.get(Field.DUE_DATE));
+        fixVersions   = Field.getResourceArray(Version.class, jsonFields.get(Field.FIX_VERSIONS), restclient);
+        issueLinks    = Field.getResourceArray(IssueLink.class, jsonFields.get(Field.ISSUE_LINKS), restclient);
+        issueType     = Field.getResource(IssueType.class, jsonFields.get(Field.ISSUE_TYPE), restclient);
+        labels        = Field.getStringArray(jsonFields.get(Field.LABELS));
+        parent        = Field.getResource(Issue.class, jsonFields.get(Field.PARENT), restclient);
+        priority      = Field.getResource(Priority.class, jsonFields.get(Field.PRIORITY), restclient);
+        project       = Field.getResource(Project.class, jsonFields.get(Field.PROJECT), restclient);
+        reporter      = Field.getResource(User.class, jsonFields.get(Field.REPORTER), restclient);
+        resolution    = Field.getResource(Resolution.class, jsonFields.get(Field.RESOLUTION), restclient);
+        resolutionDate= Field.getDateTime(jsonFields.get(Field.RESOLUTION_DATE));
+        status        = Field.getResource(Status.class, jsonFields.get(Field.STATUS), restclient);
+        subtasks      = Field.getResourceArray(Issue.class, jsonFields.get(Field.SUBTASKS), restclient);
+        summary       = Field.getString(jsonFields.get(Field.SUMMARY));
+        timeTracking  = Field.getTimeTracking(jsonFields.get(Field.TIME_TRACKING));
+        versions      = Field.getResourceArray(Version.class, jsonFields.get(Field.VERSIONS), restclient);
+        votes         = Field.getResource(Votes.class, jsonFields.get(Field.VOTES), restclient);
+        watches       = Field.getResource(Watches.class, jsonFields.get(Field.WATCHES), restclient);
+        workLogs      = Field.getWorkLogs(jsonFields.get(Field.WORKLOG), restclient);
+        timeEstimate  = Field.getInteger(jsonFields.get(Field.TIME_ESTIMATE));
+        timeSpent     = Field.getInteger(jsonFields.get(Field.TIME_SPENT));
+        createdDate   = Field.getDateTime(jsonFields.get(Field.CREATED_DATE));
+        updatedDate   = Field.getDateTime(jsonFields.get(Field.UPDATED_DATE));
     }
 
     private static String getRestUri(String key) {
@@ -1041,7 +1080,7 @@ public class Issue extends Resource {
         return getBaseUri() + "issue/bulk";
     }
 
-    public static JSONObject getCreateMetadata(RestClient restclient,
+    public static JsonNode getCreateMetadata(RestClient restclient,
                                                String project,
                                                String issueTypeId) throws JiraException {
         if (isJiraServerV9(restclient)) {
@@ -1057,10 +1096,10 @@ public class Issue extends Resource {
                serverInfo.getVersionNumbers().get(0) >= 9;
     }
 
-    private static JSONObject getCreateMetadataV9(RestClient restclient,
+    private static JsonNode getCreateMetadataV9(RestClient restclient,
                                                   String project,
                                                   String issueTypeId) throws JiraException {
-        JSON jsonFields;
+        JsonNode jsonFields;
         try {
             URI uri = restclient.buildURI(Resource.getBaseUri() + "issue/createmeta/" + project + "/issuetypes/" + issueTypeId,
                                           Collections.singletonMap("maxResults", MAX_RESULTS));
@@ -1069,28 +1108,36 @@ public class Issue extends Resource {
             throw new JiraException("No issue meta fields found", e);
         }
 
-        if (!(jsonFields instanceof JSONObject))
+        if (jsonFields == null || !jsonFields.isObject()) {
             throw new JiraException("JSON payload is malformed");
+        }
 
-        JSONObject jsonObjectFields = (JSONObject) jsonFields;
-        JSONArray values = jsonObjectFields.getJSONArray("values");
+        JsonNode values = jsonFields.get("values");
 
-        JSONObject metaFields = new JSONObject();
-        values.forEach(item -> metaFields.put(((JSONObject)item).getString("fieldId"), item));
+        if (values == null || !values.isArray()) {
+            throw new JiraException("Values array is missing or malformed");
+        }
+
+        ObjectNode metaFields = JsonNodeFactory.instance.objectNode();
+        for (JsonNode item : values) {
+            String fieldId = item.get("fieldId").asText();
+            metaFields.set(fieldId, item);
+        }
 
         return metaFields;
     }
 
-    private static JSONObject getCreateMetadataV8(RestClient restclient,
+    private static JsonNode getCreateMetadataV8(RestClient restclient,
                                                  String project,
                                                  String issueTypeId) throws JiraException {
 
         final String pval = project;
         final String itval = issueTypeId;
-        JSON result = null;
+
+        JsonNode result = null;
 
         try {
-            Map<String, String> params = new HashMap<String, String>();
+            Map<String, String> params = new HashMap<>();
             params.put("expand", "projects.issuetypes.fields");
             params.put("projectKeys", pval);
             params.put("issuetypeIds", itval);
@@ -1102,29 +1149,30 @@ public class Issue extends Resource {
             throw new JiraException("Failed to retrieve issue metadata", ex);
         }
 
-        if (!(result instanceof JSONObject))
+        if (result == null || !result.isObject()) {
             throw new JiraException("JSON payload is malformed");
+        }
 
-        JSONObject jo = (JSONObject)result;
-
-        if (jo.isNullObject() || !jo.containsKey("projects") ||
-                !(jo.get("projects") instanceof JSONArray))
+        JsonNode projectsNode = result.get("projects");
+        if (projectsNode == null || !projectsNode.isArray()) {
             throw new JiraException("Create metadata is malformed");
+        }
 
         List<Project> projects = Field.getResourceArray(
-            Project.class,
-            (JSONArray)jo.get("projects"),
-            restclient);
+                Project.class,
+                projectsNode,
+                restclient
+        );
 
         if (projects.isEmpty() || projects.get(0).getIssueTypes().isEmpty())
-            throw new JiraException("Project '"+ project + "'  or issue type id '" + issueTypeId +
+            throw new JiraException("Project '" + project + "'  or issue type id '" + issueTypeId +
                     "' missing from create metadata. Do you have enough permissions?");
 
         return projects.get(0).getIssueTypes().get(0).getFields();
     }
 
-    private JSONObject getEditMetadata() throws JiraException {
-        JSON result = null;
+    private JsonNode getEditMetadata() throws JiraException {
+        JsonNode result = null;
 
         try {
             result = restclient.get(getRestUri(key) + "/editmeta");
@@ -1132,23 +1180,24 @@ public class Issue extends Resource {
             throw new JiraException("Failed to retrieve issue metadata", ex);
         }
 
-        if (!(result instanceof JSONObject))
+        if (result == null || !result.isObject()) {
             throw new JiraException("JSON payload is malformed");
+        }
 
-        JSONObject jo = (JSONObject)result;
+        JsonNode fieldsNode = result.get("fields");
 
-        if (jo.isNullObject() || !jo.containsKey("fields") ||
-                !(jo.get("fields") instanceof JSONObject))
+        if (fieldsNode == null || !fieldsNode.isObject()) {
             throw new JiraException("Edit metadata is malformed");
+        }
 
-        return (JSONObject)jo.get("fields");
+        return fieldsNode;
     }
 
     public List<Transition> getTransitions() throws JiraException {
-        JSON result = null;
+        JsonNode result = null;
 
         try {
-            Map<String, String> params = new HashMap<String, String>();
+            Map<String, String> params = new HashMap<>();
             params.put("expand", "transitions.fields");
             URI transuri = restclient.buildURI(
                 getRestUri(key) + "/transitions",params);
@@ -1157,18 +1206,20 @@ public class Issue extends Resource {
             throw new JiraException("Failed to retrieve transitions", ex);
         }
 
-        JSONObject jo = (JSONObject)result;
+        if (result == null || !result.isObject()) {
+            throw new JiraException("JSON payload is malformed");
+        }
 
-        if (jo.isNullObject() || !jo.containsKey("transitions") ||
-                !(jo.get("transitions") instanceof JSONArray))
+        JsonNode transitionsNode = result.get("transitions");
+
+        if (transitionsNode == null || !transitionsNode.isArray()) {
             throw new JiraException("Transition metadata is missing.");
+        }
 
-        JSONArray transitions = (JSONArray) jo.get("transitions");
+        List<Transition> trans = new ArrayList<>();
 
-        List<Transition> trans = new ArrayList<Transition>();
-        for(Object obj: transitions){
-            JSONObject ob = (JSONObject) obj;
-            trans.add(new Transition(restclient, ob));
+        for (JsonNode node : transitionsNode) {
+            trans.add(new Transition(restclient, node));
         }
 
         return trans;
@@ -1281,18 +1332,18 @@ public class Issue extends Resource {
     public Comment addComment(String body, String visType, String visName)
         throws JiraException {
 
-        JSONObject req = new JSONObject();
+        ObjectNode req = JsonNodeFactory.instance.objectNode();
         req.put("body", body);
 
         if (visType != null && visName != null) {
-            JSONObject vis = new JSONObject();
+            ObjectNode vis = JsonNodeFactory.instance.objectNode();
             vis.put("type", visType);
             vis.put("value", visName);
 
-            req.put("visibility", vis);
+            req.set("visibility", vis);
         }
 
-        JSON result = null;
+        JsonNode result = null;
 
         try {
             result = restclient.post(getRestUri(key) + "/comment", req);
@@ -1300,11 +1351,11 @@ public class Issue extends Resource {
             throw new JiraException("Failed add comment to issue " + key, ex);
         }
 
-        if (!(result instanceof JSONObject)) {
+        if (result == null || !result.isObject()) {
             throw new JiraException("JSON payload is malformed");
         }
 
-        return new Comment(restclient, (JSONObject) result, key);
+        return new Comment(restclient, result, key);
     }
 
     /**
@@ -1346,33 +1397,33 @@ public class Issue extends Resource {
     public void link(String issue, String type, String body, String visType, String visName)
         throws JiraException {
 
-        JSONObject req = new JSONObject();
+        ObjectNode req = JsonNodeFactory.instance.objectNode();
 
-        JSONObject t = new JSONObject();
+        ObjectNode t = JsonNodeFactory.instance.objectNode();
         t.put("name", type);
-        req.put("type", t);
+        req.set("type", t);
 
-        JSONObject inward = new JSONObject();
+        ObjectNode inward = JsonNodeFactory.instance.objectNode();
         inward.put("key", key);
-        req.put("inwardIssue", inward);
+        req.set("inwardIssue", inward);
 
-        JSONObject outward = new JSONObject();
+        ObjectNode outward = JsonNodeFactory.instance.objectNode();
         outward.put("key", issue);
-        req.put("outwardIssue", outward);
+        req.set("outwardIssue", outward);
 
         if (body != null) {
-            JSONObject comment = new JSONObject();
+            ObjectNode comment = JsonNodeFactory.instance.objectNode();
             comment.put("body", body);
 
             if (visType != null && visName != null) {
-                JSONObject vis = new JSONObject();
+                ObjectNode vis = JsonNodeFactory.instance.objectNode();
                 vis.put("type", visType);
                 vis.put("value", visName);
 
-                comment.put("visibility", vis);
+                comment.set("visibility", vis);
             }
 
-            req.put("comment", comment);
+            req.set("comment", comment);
         }
 
         try {
@@ -1406,7 +1457,7 @@ public class Issue extends Resource {
             .field(Field.ISSUE_TYPE, issueType);
     }
 
-    public static FluentCreateComposed createBulk(RestClient restclient,JSONObject createmetadata, String project,
+    public static FluentCreateComposed createBulk(RestClient restclient, JsonNode createmetadata, String project,
                                                   String issueType, String serverType)
             throws JiraException {
 
@@ -1430,10 +1481,10 @@ public class Issue extends Resource {
                 .field(Field.PARENT, getKey());
     }
 
-    private static JSONObject realGet(RestClient restclient, String key, Map<String, String> queryParams)
+    private static JsonNode realGet(RestClient restclient, String key, Map<String, String> queryParams)
             throws JiraException {
 
-        JSON result = null;
+        JsonNode result = null;
 
         try {
             URI uri = restclient.buildURI(getBaseUri() + "issue/" + key, queryParams);
@@ -1442,11 +1493,11 @@ public class Issue extends Resource {
             throw new JiraException("Failed to retrieve issue " + key, ex);
         }
 
-        if (!(result instanceof JSONObject)) {
+        if (result == null || !result.isObject()) {
             throw new JiraException("JSON payload is malformed");
         }
 
-        return (JSONObject) result;
+        return result;
     }
 
     /**
@@ -1462,7 +1513,7 @@ public class Issue extends Resource {
     public static Issue get(RestClient restclient, String key)
             throws JiraException {
 
-        return new Issue(restclient, realGet(restclient, key, new HashMap<String, String>()));
+        return new Issue(restclient, realGet(restclient, key, new HashMap<>()));
     }
 
     /**
@@ -1489,7 +1540,7 @@ public class Issue extends Resource {
     public static Issue get(RestClient restclient, String key, final String includedFields)
             throws JiraException {
 
-        Map<String, String> queryParams = new HashMap<String, String>();
+        Map<String, String> queryParams = new HashMap<>();
         queryParams.put("fields", includedFields);
         return new Issue(restclient, realGet(restclient, key, queryParams));
     }
@@ -1520,7 +1571,7 @@ public class Issue extends Resource {
     public static Issue get(RestClient restclient, String key, final String includedFields,
             final String expand) throws JiraException {
 
-        Map<String, String> queryParams = new HashMap<String, String>();
+        Map<String, String> queryParams = new HashMap<>();
         queryParams.put("fields", includedFields);
         if (expand != null) {
             queryParams.put("expand", expand);
@@ -1589,7 +1640,7 @@ public class Issue extends Resource {
     protected static URI createSearchURI(RestClient restclient, String jql,
             String includedFields, String expandFields, Integer maxResults,
             Integer startAt) throws URISyntaxException {
-        Map<String, String> queryParams = new HashMap<String, String>();
+        Map<String, String> queryParams = new HashMap<>();
         queryParams.put("jql", jql);
         if(maxResults != null){
             queryParams.put("maxResults", String.valueOf(maxResults));
@@ -1605,8 +1656,7 @@ public class Issue extends Resource {
         }
         queryParams.put("validateQuery", "false");
 
-        URI searchUri = restclient.buildURI(getBaseUri() + "search", queryParams);
-        return searchUri;
+        return restclient.buildURI(getBaseUri() + "search", queryParams);
     }
 
     /**
@@ -1616,7 +1666,7 @@ public class Issue extends Resource {
      * @throws JiraException when the retrieval fails
      */
     public void refresh() throws JiraException {
-        JSONObject result = realGet(restclient, key, new HashMap<String, String>());
+        JsonNode result = realGet(restclient, key, new HashMap<>());
         deserialise(result);
     }
 
@@ -1638,9 +1688,9 @@ public class Issue extends Resource {
      */
     public void refresh(final String includedFields) throws JiraException {
 
-        Map<String, String> queryParams = new HashMap<String, String>();
+        Map<String, String> queryParams = new HashMap<>();
         queryParams.put("fields", includedFields);
-        JSONObject result = realGet(restclient, key, queryParams);
+        JsonNode result = realGet(restclient, key, queryParams);
         deserialise(result);
     }
 
@@ -1736,7 +1786,7 @@ public class Issue extends Resource {
 
         try {
             final String u = username;
-            Map<String, String> connectionParams = new HashMap<String, String>();
+            Map<String, String> connectionParams = new HashMap<>();
             connectionParams.put("username", u);
             URI uri = restclient.buildURI(
                 getRestUri(key) + "/watchers", connectionParams);
@@ -1818,11 +1868,10 @@ public class Issue extends Resource {
     }
 
     public List<RemoteLink> getRemoteLinks() throws JiraException {
-        JSONArray obj;
+        JsonNode obj;
         try {
             URI uri = restclient.buildURI(getRestUri(key) + "/remotelink");
-            JSON json = restclient.get(uri);
-            obj = (JSONArray) json;
+            obj = restclient.get(uri);
         } catch (Exception ex) {
             throw new JiraException("Failed to get remote links for issue "
                     + key, ex);
@@ -1872,11 +1921,10 @@ public class Issue extends Resource {
     }
 
     public List<WorkLog> getAllWorkLogs() throws JiraException {
-        JSONObject obj;
+        JsonNode obj;
         try {
             URI uri = restclient.buildURI(getRestUri(key) + "/worklog");
-            JSON json = restclient.get(uri);
-            obj = (JSONObject) json;
+            obj = restclient.get(uri);
         } catch (Exception ex) {
             throw new JiraException("Failed to get worklog for issue "
                     + key, ex);
