@@ -28,12 +28,12 @@ public class FieldTest {
         /*
          * When: Parse the field to JSON
          */
-        Object result = Field.toJson(name, value, editmeta);
+        JsonNode result = Field.toJson(name, value, editmeta);
 
         /*
          * Then: Return the value
          */
-        assertEquals(result, "{\"value\":\"" + value + "\"}");
+        assertEquals(result.toString(), "{\"value\":\"" + value + "\"}");
     }
 
     @Test
@@ -48,13 +48,13 @@ public class FieldTest {
         /*
          * When: Parse the field to JSON
          */
-        Object result = Field.toJson(name, value, editmeta);
+        JsonNode result = Field.toJson(name, value, editmeta);
 
         /*
          * Then: Returns the priority with id setted instead of name
          */
-        assertEquals(result, "{\"id\":\"" + value + "\"}");
+        assertEquals(result.toString(), "{\"id\":\"" + value + "\"}");
 
-        assertNotSame(result, "{\"value\":\"" + value + "\"}");
+        assertNotSame(result.toString(), "{\"value\":\"" + value + "\"}");
     }
 }
