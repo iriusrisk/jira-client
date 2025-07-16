@@ -1,6 +1,8 @@
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSONObject;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import org.junit.Test;
 import org.powermock.api.mockito.PowerMockito;
 
@@ -14,17 +16,17 @@ import static org.powermock.api.mockito.PowerMockito.when;
 
 public class StatusTest {
 
-    private String statusID = "10004";
-    private String description = "Issue is currently in progress.";
-    private String iconURL = "https://site/images/icons/statuses/open.png";
+    private static final String STATUS_ID = "10004";
+    private static final String DESCRIPTION = "Issue is currently in progress.";
+    private static final String ICON_URL = "https://site/images/icons/statuses/open.png";
 
     @Test
     public void testJSONDeserializer() throws IOException, URISyntaxException {
         Status status = new Status(new RestClient(null, new URI("/123/asd")), getTestJSON());
-        assertEquals(status.getDescription(), description);
-        assertEquals(status.getIconUrl(), iconURL);
+        assertEquals(status.getDescription(), DESCRIPTION);
+        assertEquals(status.getIconUrl(), ICON_URL);
         assertEquals(status.getName(), "Open");
-        assertEquals(status.getId(), statusID);
+        assertEquals(status.getId(), STATUS_ID);
     }
 
     @Test
@@ -32,10 +34,10 @@ public class StatusTest {
         final RestClient restClient = PowerMockito.mock(RestClient.class);
         when(restClient.get(anyString())).thenReturn(getTestJSON());
         Status status = Status.get(restClient,"someID");
-        assertEquals(status.getDescription(), description);
-        assertEquals(status.getIconUrl(), iconURL);
+        assertEquals(status.getDescription(), DESCRIPTION);
+        assertEquals(status.getIconUrl(), ICON_URL);
         assertEquals(status.getName(), "Open");
-        assertEquals(status.getId(), statusID);
+        assertEquals(status.getId(), STATUS_ID);
     }
 
     @Test(expected = JiraException.class)
@@ -51,12 +53,12 @@ public class StatusTest {
         Status.get(mockRestClient,"issueNumber");
     }
 
-    private JSONObject getTestJSON() {
-        JSONObject json = new JSONObject();
-        json.put("description", description);
+    private ObjectNode getTestJSON() {
+        ObjectNode json = JsonNodeFactory.instance.objectNode();
+        json.put("description", DESCRIPTION);
         json.put("name", "Open");
-        json.put("iconUrl", iconURL);
-        json.put("id", statusID);
+        json.put("iconUrl", ICON_URL);
+        json.put("id", STATUS_ID);
 
         return json;
     }
@@ -66,6 +68,4 @@ public class StatusTest {
         Status status = new Status(new RestClient(null, new URI("/123/asd")), getTestJSON());
         assertEquals("Open",status.toString());
     }
-
-
 }

@@ -17,7 +17,7 @@ public class IssueTypeTest {
 
     @Test
     public void testIssueTypeInit() {
-        IssueType issueType = new IssueType(null, null);
+        new IssueType(null, null);
     }
 
     @Test
@@ -72,7 +72,7 @@ public class IssueTypeTest {
     }
 
     @Test
-    public void testIssueTypeToString(){
+    public void testIssueTypeToString() {
         IssueType issueType = new IssueType(null, getTestJSON());
 
         assertEquals(issueType.toString(),"Story");
