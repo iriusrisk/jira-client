@@ -1,25 +1,29 @@
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSONObject;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.modules.junit4.PowerMockRunner;
 
-import static junit.framework.Assert.*;
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertTrue;
 import static org.mockito.Matchers.anyString;
 
 @RunWith(PowerMockRunner.class)
 public class VotesTest {
 
     @Test
-    public void testVotesInit(){
-        new Votes(null,null);
+    public void testVotesInit() {
+        new Votes(null, null);
     }
 
     @Test
-    public void testVoteMap() throws Exception {
-        final JSONObject json = new JSONObject();
+    public void testVoteMap() {
+        ObjectNode json = JsonNodeFactory.instance.objectNode();
         json.put("self","someURL");
         json.put("id","1111");
         json.put("votes",12);
@@ -49,7 +53,7 @@ public class VotesTest {
     @Test
     public void testGetVotesFromID() throws Exception {
         final RestClient mockRestClient = PowerMockito.mock(RestClient.class);
-        final JSONObject returnedFromService = new JSONObject();
+        ObjectNode returnedFromService = JsonNodeFactory.instance.objectNode();
 
         returnedFromService.put("self", "someURL");
         returnedFromService.put("id", "1111");
@@ -79,7 +83,7 @@ public class VotesTest {
 
     @Test
     public void testGetToString(){
-        final JSONObject json = new JSONObject();
+        ObjectNode json = JsonNodeFactory.instance.objectNode();
         json.put("self","someURL");
         json.put("id","1111");
         json.put("votes",12);
@@ -89,13 +93,13 @@ public class VotesTest {
         assertEquals(votes.toString(),"12");
     }
 
-    private JSONObject getTestJSON() {
-        JSONObject jsonObject = new JSONObject();
+    private ObjectNode getTestJSON() {
+        ObjectNode jsonObject = JsonNodeFactory.instance.objectNode();
 
-        jsonObject.put("self","https://brainbubble.atlassian.net/rest/api/2/issue/FILTA-43/votes");
-        jsonObject.put("votes",0);
-        jsonObject.put("hasVoted",false);
-        jsonObject.put("id","10");
+        jsonObject.put("self", "https://brainbubble.atlassian.net/rest/api/2/issue/FILTA-43/votes");
+        jsonObject.put("votes", 0);
+        jsonObject.put("hasVoted", false);
+        jsonObject.put("id", "10");
         return jsonObject;
     }
 }

@@ -1,12 +1,14 @@
 # jira-client #
 
-[![Build Status](https://travis-ci.org/rcarz/jira-client.svg?branch=master)](https://travis-ci.org/rcarz/jira-client)
+[![Build Status](https://travis-ci.org/rcarz/jira-client.svg?branch=master)](https://github.com/iriusrisk/jira-client)
 
 jira-client is a simple and lightweight JIRA REST client library for Java.
 
 The goal of the project is to provide **simple** and clean English idiomatic expressions for interacting with JIRA. In pursuit of this goal, jira-client lacks the usual verbose and cumbersome contortions often found in Java applications. And since the implementation isn't buried under 57 layers of complicated abstractions, jira-client is easy to extend and debug.
 
-jira-client depends on [Apache HttpComponents](http://hc.apache.org/), [json-lib](http://json.sourceforge.net/), and [joda-time](http://www.joda.org/joda-time/).
+jira-client depends on [Apache HttpComponents](http://hc.apache.org/), [jackson](https://github.com/FasterXML/jackson), and [joda-time](http://www.joda.org/joda-time/).
+
+**With version 2.0.0 we have removed support for agile and greenhopper**
 
 ## Features ##
 
@@ -34,7 +36,7 @@ Point your *settings.xml* at [Maven Central](http://repo1.maven.org/maven2) and 
     <dependency>
       <groupId>net.rcarz</groupId>
       <artifactId>jira-client</artifactId>
-      <version>0.5</version>
+      <version>2.0.0</version>
       <scope>compile</scope>
     </dependency>
 ```
@@ -214,138 +216,3 @@ public class Example {
     }
 }
 ```
-
-## GreenHopper Example ##
-
-```java
-import java.util.List;
-
-import net.rcarz.jiraclient.BasicCredentials;
-import net.rcarz.jiraclient.Issue;
-import net.rcarz.jiraclient.JiraClient;
-import net.rcarz.jiraclient.JiraException;
-import net.rcarz.jiraclient.greenhopper.Epic;
-import net.rcarz.jiraclient.greenhopper.GreenHopperClient;
-import net.rcarz.jiraclient.greenhopper.Marker;
-import net.rcarz.jiraclient.greenhopper.RapidView;
-import net.rcarz.jiraclient.greenhopper.Sprint;
-import net.rcarz.jiraclient.greenhopper.SprintIssue;
-import net.rcarz.jiraclient.greenhopper.SprintReport;
-
-public class Example {
-
-    public static void main(String[] args) {
-
-        BasicCredentials creds = new BasicCredentials("batman", "pow! pow!");
-        JiraClient jira = new JiraClient("https://jira.example.com/jira", creds);
-        GreenHopperClient gh = new GreenHopperClient(jira);
-
-        try {
-            /* Retrieve all Rapid Boards */
-            List<RapidView> allRapidBoards = gh.getRapidViews();
-
-            /* Retrieve a specific Rapid Board by ID */
-            RapidView board = gh.getRapidView(123);
-
-            /* Print the name of all current and past sprints */
-            List<Sprint> sprints = board.getSprints();
-            for (Sprint s : sprints)
-                System.out.println(s);
-
-            /* Get the sprint report, print the sprint start date
-               and the number of completed issues */
-            SprintReport sr = board.getSprintReport();
-            System.out.println(sr.getSprint().getStartDate());
-            System.out.println(sr.getCompletedIssues().size());
-
-            /* Get backlog data */
-            Backlog backlog = board.getBacklogData();
-
-            /* Print epic names */
-            for (Epic e : backlog.getEpics())
-                System.out.println(e);
-
-            /* Print all issues in the backlog */
-            for (SprintIssue si : backlog.getIssues())
-                System.out.println(si);
-
-            /* Print the names of sprints that haven't started yet */
-            for (Marker m : backlog.getMarkers())
-                System.out.println(m);
-
-            /* Get the first issue on the backlog and add a comment */
-            SprintIssue firstIssue = backlog.getIssues().get(0);
-            Issue jiraIssue = firstIssue.getJiraIssue();
-            jiraIssue.addComment("a comment!");
-        } catch (JiraException ex) {
-            System.err.println(ex.getMessage());
-
-            if (ex.getCause() != null)
-                System.err.println(ex.getCause().getMessage());
-        }
-    }
-}
-```
-
-## Agile API ##
-https://docs.atlassian.com/jira-software/REST/cloud/
-
-### Agile supported calls ###
-| Class | Method | REST Call |
-| ----- | ------ | --------- |
-| [AgileClient](src/main/java/net/rcarz/jiraclient/agile/AgileClient.java) | ```List<Board> getBoards()``` | GET /rest/agile/1.0/board |
-| | ```Board getBoard(long id)``` | GET /rest/agile/1.0/board/{boardId} |
-| | ```Sprint getSprint(long id)``` | GET /rest/agile/1.0/sprint/{sprintId} |
-| | ```Epic getEpic(long id)``` | GET /rest/agile/1.0/epic/{epicId} |
-| | ```Issue getIssue(long id)``` | GET /rest/agile/1.0/issue/{issueId} |
-| | ```Issue getIssue(String key)``` | GET /rest/agile/1.0/issue/{issueKey} |
-| [Board](src/main/java/net/rcarz/jiraclient/agile/Board.java) | ``` static List<Board> getAll(RestClient restclient)``` | GET /rest/agile/1.0/board |
-| | ```static Board get(RestClient restclient, long id)``` | GET /rest/agile/1.0/board/{boardId} |
-| | ```List<Sprint> getSprints()``` | GET /rest/agile/1.0/board/{boardId}/sprint |
-| * | ```List<Epic> getEpics()``` | GET /rest/agile/1.0/board/{boardId}/epic
-| * | ```List<Issue> getBacklog()``` | GET /rest/agile/1.0/board/{boardId}/backlog
-| * | ```List<Issue> getIssuesWithoutEpic()``` | GET /rest/agile/1.0/board/{boardId}/epic/none/issue
-| [Sprint](src/main/java/net/rcarz/jiraclient/agile/Sprint.java) | ``` static Sprint get(RestClient restclient, long sprintId)``` | GET /rest/agile/1.0/sprint/{sprintId} |
-| | ```static List<Sprint> getAll(RestClient restclient, long boardId)``` | GET /rest/agile/1.0/board/{boardId}/sprint |
-| * | ```List<Issue> getIssues()``` | GET /rest/agile/1.0/sprint/{sprintId}/issue |
-| [Epic](src/main/java/net/rcarz/jiraclient/agile/Epic.java) | ```static Epic get(RestClient restclient, long id)``` | GET /rest/agile/1.0/epic/{epicId} |
-| * | ```List<Issue> getIssues()``` | GET /rest/agile/1.0/epic/{epicId}/issue |
-| [Issue](src/main/java/net/rcarz/jiraclient/agile/Issue.java) | ```static Issue get(RestClient restclient, long id)``` | GET /rest/agile/1.0/issue/{issueId} |
-| | ```static Issue get(RestClient restclient, String key)``` | GET /rest/agile/1.0/issue/{issueKey} |
-    
-    
-
-### Agile Example ###
-To see more examples, look at [AgileClientDemoTest](src/test/groovy/AgileClientDemoTest.groovy)
-```java
-import java.util.List;
-
-import net.rcarz.jiraclient.BasicCredentials;
-import net.rcarz.jiraclient.Issue;
-import net.rcarz.jiraclient.JiraClient;
-import net.rcarz.jiraclient.JiraException;
-import net.rcarz.jiraclient.agile.Board;
-import net.rcarz.jiraclient.agile.AgileClient;
-
-public class Example {
-
-    public static void main(String[] args) {
-
-        BasicCredentials creds = new BasicCredentials("batman", "pow! pow!");
-        JiraClient jira = new JiraClient("https://jira.example.com/jira", creds);
-        AgileClient agileClient = new AgileClient(jira);
-
-        try {
-            /* Retrieve all Boards */
-            List<Board> allBoards = agileClient.getBoards();
-        } catch (JiraException ex) {
-            System.err.println(ex.getMessage());
-
-            if (ex.getCause() != null) {
-                System.err.println(ex.getCause().getMessage());
-            }
-        }
-    }
-}
-```
-

@@ -19,10 +19,8 @@
 
 package net.rcarz.jiraclient;
 
-import java.util.Map;
-
-import net.sf.json.JSON;
-import net.sf.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Represents a project category.
@@ -38,20 +36,21 @@ public class ProjectCategory extends Resource {
      * @param restclient REST client instance
      * @param json JSON payload
      */
-    protected ProjectCategory(RestClient restclient, JSONObject json) {
+    private static final ObjectMapper mapper = new ObjectMapper();
+
+    protected ProjectCategory(RestClient restclient, JsonNode json) {
         super(restclient);
 
-        if (json != null)
+        if (json != null) {
             deserialise(json);
+        }
     }
 
-    private void deserialise(JSONObject json) {
-        Map map = json;
-
-        self = Field.getString(map.get("self"));
-        id = Field.getString(map.get("id"));
-        description = Field.getString(map.get("description"));
-        name = Field.getString(map.get("name"));
+    private void deserialise(JsonNode json) {
+        self = Field.getString(json.get("self"));
+        id = Field.getString(json.get("id"));
+        description = Field.getString(json.get("description"));
+        name = Field.getString(json.get("name"));
     }
 
     /**
@@ -67,7 +66,7 @@ public class ProjectCategory extends Resource {
     public static ProjectCategory get(RestClient restclient, String id)
             throws JiraException {
 
-        JSON result = null;
+        JsonNode result = null;
 
         try {
             result = restclient.get(getBaseUri() + "projectCategory/" + id);
@@ -75,10 +74,11 @@ public class ProjectCategory extends Resource {
             throw new JiraException("Failed to retrieve status " + id, ex);
         }
 
-        if (!(result instanceof JSONObject))
+        if (result == null || !result.isObject()) {
             throw new JiraException("JSON payload is malformed");
+        }
 
-        return new ProjectCategory(restclient, (JSONObject)result);
+        return new ProjectCategory(restclient, result);
     }
 
     @Override

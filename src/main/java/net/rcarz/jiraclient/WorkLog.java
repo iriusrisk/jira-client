@@ -19,12 +19,9 @@
 
 package net.rcarz.jiraclient;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Map;
+import com.fasterxml.jackson.databind.JsonNode;
 
-import net.sf.json.JSON;
-import net.sf.json.JSONObject;
+import java.util.Date;
 
 /**
  * Represents an issue work log.
@@ -46,26 +43,24 @@ public class WorkLog extends Resource {
      * @param restclient REST client instance
      * @param json JSON payload
      */
-    protected WorkLog(RestClient restclient, JSONObject json) {
+    protected WorkLog(RestClient restclient, JsonNode json) {
         super(restclient);
 
         if (json != null)
             deserialise(json);
     }
 
-    private void deserialise(JSONObject json) {
-        Map map = json;
-
-        self = Field.getString(map.get("self"));
-        id = Field.getString(map.get("id"));
-        author = Field.getResource(User.class, map.get("author"), restclient);
-        comment = Field.getString(map.get("comment"));
-        created = Field.getDateTime(map.get("created"));
-        updated = Field.getDateTime(map.get("updated"));
-        updateAuthor = Field.getResource(User.class, map.get("updateAuthor"), restclient);
-        started = Field.getDateTime(map.get("started"));
-        timeSpent = Field.getString(map.get("timeSpent"));
-        timeSpentSeconds = Field.getInteger(map.get("timeSpentSeconds"));
+    private void deserialise(JsonNode json) {
+        self = Field.getString(json.get("self"));
+        id = Field.getString(json.get("id"));
+        author = Field.getResource(User.class, json.get("author"), restclient);
+        comment = Field.getString(json.get("comment"));
+        created = Field.getDateTime(json.get("created"));
+        updated = Field.getDateTime(json.get("updated"));
+        updateAuthor = Field.getResource(User.class, json.get("updateAuthor"), restclient);
+        started = Field.getDateTime(json.get("started"));
+        timeSpent = Field.getString(json.get("timeSpent"));
+        timeSpentSeconds = Field.getInteger(json.get("timeSpentSeconds"));
     }
 
     /**
@@ -82,7 +77,7 @@ public class WorkLog extends Resource {
     public static WorkLog get(RestClient restclient, String issue, String id)
         throws JiraException {
 
-        JSON result = null;
+        JsonNode result = null;
 
         try {
             result = restclient.get(getBaseUri() + "issue/" + issue + "/worklog/" + id);
@@ -90,10 +85,11 @@ public class WorkLog extends Resource {
             throw new JiraException("Failed to retrieve work log " + id + " on issue " + issue, ex);
         }
 
-        if (!(result instanceof JSONObject))
+        if (result == null || !result.isObject()) {
             throw new JiraException("JSON payload is malformed");
+        }
 
-        return new WorkLog(restclient, (JSONObject)result);
+        return new WorkLog(restclient, result);
     }
 
     @Override

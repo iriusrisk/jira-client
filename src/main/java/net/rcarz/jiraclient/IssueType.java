@@ -19,10 +19,7 @@
 
 package net.rcarz.jiraclient;
 
-import java.util.Map;
-
-import net.sf.json.JSON;
-import net.sf.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
 
 /**
  * Represents an issue type.
@@ -33,33 +30,32 @@ public class IssueType extends Resource {
     private String iconUrl = null;
     private String name = null;
     private boolean subtask = false;
-    private JSONObject fields = null;
+    private JsonNode fields = null;
 
     /**
      * Creates an issue type from a JSON payload.
      *
      * @param restclient REST client instance
-     * @param json JSON payload
+     * @param json       JSON payload
      */
-    protected IssueType(RestClient restclient, JSONObject json) {
+    protected IssueType(RestClient restclient, JsonNode json) {
         super(restclient);
 
         if (json != null)
             deserialise(json);
     }
 
-    private void deserialise(JSONObject json) {
-        Map map = json;
+    private void deserialise(JsonNode json) {
+        self = Field.getString(json.get("self"));
+        id = Field.getString(json.get("id"));
+        description = Field.getString(json.get("description"));
+        iconUrl = Field.getString(json.get("iconUrl"));
+        name = Field.getString(json.get("name"));
+        subtask = Field.getBoolean(json.get("subtask"));
 
-        self = Field.getString(map.get("self"));
-        id = Field.getString(map.get("id"));
-        description = Field.getString(map.get("description"));
-        iconUrl = Field.getString(map.get("iconUrl"));
-        name = Field.getString(map.get("name"));
-        subtask = Field.getBoolean(map.get("subtask"));
-
-        if (map.containsKey("fields") && map.get("fields") instanceof JSONObject)
-            fields = (JSONObject)map.get("fields");
+        if (json.has("fields") && json.get("fields").isObject()) {
+            fields = json.get("fields");
+        }
     }
 
     /**
@@ -75,7 +71,7 @@ public class IssueType extends Resource {
     public static IssueType get(RestClient restclient, String id)
         throws JiraException {
 
-        JSON result = null;
+        JsonNode result = null;
 
         try {
             result = restclient.get(getBaseUri() + "issuetype/" + id);
@@ -83,10 +79,11 @@ public class IssueType extends Resource {
             throw new JiraException("Failed to retrieve issue type " + id, ex);
         }
 
-        if (!(result instanceof JSONObject))
+        if (result == null || !result.isObject()) {
             throw new JiraException("JSON payload is malformed");
+        }
 
-        return new IssueType(restclient, (JSONObject)result);
+        return new IssueType(restclient, result);
     }
 
     @Override
@@ -110,7 +107,7 @@ public class IssueType extends Resource {
         return subtask;
     }
 
-    public JSONObject getFields() {
+    public JsonNode getFields() {
         return fields;
     }
 }

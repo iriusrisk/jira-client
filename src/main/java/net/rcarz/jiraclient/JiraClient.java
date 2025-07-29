@@ -15,9 +15,8 @@
 
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSON;
-import net.sf.json.JSONArray;
-import net.sf.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 
 import org.apache.http.client.HttpClient;
 import org.apache.http.impl.client.DefaultHttpClient;
@@ -135,11 +134,11 @@ public class JiraClient {
      *
      * @throws JiraException when something goes wrong
      */
-    public Issue.FluentCreateComposed createIssues(JSONObject createmeta, String project, String issueType,
+    public Issue.FluentCreateComposed createIssues(JsonNode createmeta, String project, String issueType,
                                                    String serverType)
             throws JiraException {
 
-        return Issue.createBulk(restclient,createmeta, project, issueType, serverType);
+        return Issue.createBulk(restclient, createmeta, project, issueType, serverType);
     }
 
     /**
@@ -174,7 +173,7 @@ public class JiraClient {
      */
     public List<Issue> getIssues(String project, List<String> keys, Integer maxResults) throws JiraException {
         if (keys.isEmpty()) {
-            return new ArrayList<Issue>();
+            return new ArrayList<>();
         } else {
             StringBuilder sb = new StringBuilder();
             for (String s : keys) {
@@ -416,13 +415,14 @@ public class JiraClient {
     public List<Priority> getPriorities() throws JiraException {
         try {
             URI uri = restclient.buildURI(Resource.getBaseUri() + "priority");
-            JSON response = restclient.get(uri);
-            JSONArray prioritiesArray = JSONArray.fromObject(response);
+            JsonNode response = restclient.get(uri);
 
-            List<Priority> priorities = new ArrayList<Priority>(prioritiesArray.size());
-            for (int i = 0; i < prioritiesArray.size(); i++) {
-                JSONObject p = prioritiesArray.getJSONObject(i);
-                priorities.add(new Priority(restclient, p));
+            List<Priority> priorities = new ArrayList<Priority>();
+            if (response.isArray()) {
+                ArrayNode prioritiesArray = (ArrayNode) response;
+                for (JsonNode p : prioritiesArray) {
+                    priorities.add(new Priority(restclient, p));
+                }
             }
 
             return priorities;
@@ -441,8 +441,8 @@ public class JiraClient {
      * @throws JiraException when the search fails
      */
     public List<CustomFieldOption> getCustomFieldAllowedValues(String field, String project, String issueType) throws JiraException {
-        JSONObject createMetadata = (JSONObject) Issue.getCreateMetadata(restclient, project, issueType);
-        JSONObject fieldMetadata = (JSONObject) createMetadata.get(field);
+        JsonNode createMetadata = Issue.getCreateMetadata(restclient, project, issueType);
+        JsonNode fieldMetadata = createMetadata.get(field);
         List<CustomFieldOption> customFieldOptions = Field.getResourceArray(
                 CustomFieldOption.class,
                 fieldMetadata.get("allowedValues"),
@@ -460,8 +460,8 @@ public class JiraClient {
      * @throws JiraException when the search fails
      */
     public List<Component> getComponentsAllowedValues(String project, String issueType) throws JiraException {
-        JSONObject createMetadata = (JSONObject) Issue.getCreateMetadata(restclient, project, issueType);
-        JSONObject fieldMetadata = (JSONObject) createMetadata.get(Field.COMPONENTS);
+        JsonNode createMetadata = Issue.getCreateMetadata(restclient, project, issueType);
+        JsonNode fieldMetadata = createMetadata.get(Field.COMPONENTS);
         List<Component> componentOptions = Field.getResourceArray(
                 Component.class,
                 fieldMetadata.get("allowedValues"),
@@ -488,13 +488,14 @@ public class JiraClient {
     public List<Project> getProjects() throws JiraException {
         try {
             URI uri = restclient.buildURI(Resource.getBaseUri() + "project");
-            JSON response = restclient.get(uri);
-            JSONArray projectsArray = JSONArray.fromObject(response);
+            JsonNode response = restclient.get(uri);
 
-            List<Project> projects = new ArrayList<Project>(projectsArray.size());
-            for (int i = 0; i < projectsArray.size(); i++) {
-                JSONObject p = projectsArray.getJSONObject(i);
-                projects.add(new Project(restclient, p));
+            List<Project> projects = new ArrayList<>();
+            if (response.isArray()) {
+                ArrayNode projectsArray = (ArrayNode) response;
+                for (JsonNode p : projectsArray) {
+                    projects.add(new Project(restclient, p));
+                }
             }
 
             return projects;
@@ -513,8 +514,8 @@ public class JiraClient {
     public Project getProject(String key) throws JiraException {
         try {
             URI uri = restclient.buildURI(Resource.getBaseUri() + "project/" + key);
-            JSON response = restclient.get(uri);
-            return new Project(restclient, (JSONObject) response);
+            JsonNode response = restclient.get(uri);
+            return new Project(restclient, response);
         } catch (Exception ex) {
             throw new JiraException(ex.getMessage(), ex);
         }
@@ -529,13 +530,14 @@ public class JiraClient {
     public List<IssueType> getIssueTypes() throws JiraException {
         try {
             URI uri = restclient.buildURI(Resource.getBaseUri() + "issuetype");
-            JSON response = restclient.get(uri);
-            JSONArray issueTypeArray = JSONArray.fromObject(response);
+            JsonNode response = restclient.get(uri);
 
-            List<IssueType> issueTypes = new ArrayList<IssueType>(issueTypeArray.size());
-            for (int i = 0; i < issueTypeArray.size(); i++) {
-                JSONObject it = issueTypeArray.getJSONObject(i);
-                issueTypes.add(new IssueType(restclient, it));
+            List<IssueType> issueTypes = new ArrayList<>();
+            if (response.isArray()) {
+                ArrayNode issueTypeArray = (ArrayNode) response;
+                for (JsonNode it : issueTypeArray) {
+                    issueTypes.add(new IssueType(restclient, it));
+                }
             }
 
             return issueTypes;
@@ -587,22 +589,21 @@ public class JiraClient {
     public ArrayList<IssueHistory> getIssueChangeLog(Issue issue) throws JiraException {
         try {
             ArrayList<IssueHistory> changes = null;
-            JSON response = getNextPortion(issue, 0);
+            JsonNode response = getNextPortion(issue, 0);
 
             while (true) {
-                JSONObject object = JSONObject.fromObject(response);
-                Object opers = object.get("changelog");
-                object = JSONObject.fromObject(opers);
-                Integer totalObj = (Integer) object.get("total");
-                JSONArray histories = JSONArray.fromObject(object.get("histories"));
+                JsonNode changelog = response.get("changelog");
+                int totalObj = changelog.get("total").asInt();
+                JsonNode histories = changelog.get("histories");
 
                 if (changes == null) {
                     changes = new ArrayList<IssueHistory>(totalObj);
                 }
 
-                for (int i = 0; i < histories.size(); i++) {
-                    JSONObject p = histories.getJSONObject(i);
-                    changes.add(new IssueHistory(restclient, p));
+                if (histories.isArray()) {
+                    for (JsonNode p : histories) {
+                        changes.add(new IssueHistory(restclient, p));
+                    }
                 }
 
                 if (changes.size() >= totalObj) {
@@ -618,10 +619,10 @@ public class JiraClient {
         }
     }
 
-    private JSON getNextPortion(Issue issue, Integer startAt)
+    private JsonNode getNextPortion(Issue issue, Integer startAt)
             throws URISyntaxException, RestException, IOException {
 
-        Map<String, String> params = new HashMap<String, String>();
+        Map<String, String> params = new HashMap<>();
         if (startAt != null) {
             params.put("startAt", String.valueOf(startAt));
         }

@@ -1,6 +1,8 @@
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSONObject;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import org.junit.Test;
 import org.powermock.api.mockito.PowerMockito;
 
@@ -57,8 +59,8 @@ public class WatchesTest {
         assertEquals(watches.toString(), "0");
     }
 
-    private JSONObject getTestJSON() {
-        JSONObject jsonObject = new JSONObject();
+    private ObjectNode getTestJSON() {
+        ObjectNode jsonObject = JsonNodeFactory.instance.objectNode();
 
         jsonObject.put("id", "10");
         jsonObject.put("self", "https://brainbubble.atlassian.net/rest/api/2/issue/FILTA-43/watchers");

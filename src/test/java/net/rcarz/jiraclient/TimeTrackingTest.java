@@ -1,21 +1,20 @@
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSONObject;
-import org.junit.Test;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import java.sql.Time;
+import org.junit.Test;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNull;
-import static junit.framework.Assert.assertSame;
 
 public class TimeTrackingTest {
 
-  private Issue issue = new Issue(null, Utils.getTestIssue());
-  private TimeTracking time = issue.getTimeTracking();
-
   @Test
   public void testAttributeMappings() {
+    Issue issue = new Issue(null, Utils.getTestIssue());
+    TimeTracking time = issue.getTimeTracking();
     assertEquals("1w", time.getOriginalEstimate());
     assertEquals(144000, time.getOriginalEstimateSeconds());
 
@@ -26,18 +25,16 @@ public class TimeTrackingTest {
     assertEquals(86400, time.getTimeSpentSeconds());
   }
 
-
   @Test
-  public void testCreateTimeTracking() throws Exception {
+  public void testCreateTimeTracking() {
 
-    final JSONObject testJson = new JSONObject();
+    ObjectNode testJson = JsonNodeFactory.instance.objectNode();
     testJson.put("originalEstimate", "1 day");
     testJson.put("remainingEstimate", "2 days");
     testJson.put("timeSpent", "3 days");
     testJson.put("originalEstimateSeconds", 12);
     testJson.put("remainingEstimateSeconds", 10);
     testJson.put("timeSpentSeconds", 14);
-
 
     TimeTracking timeTracking = new TimeTracking(testJson);
     assertEquals("1 day", timeTracking.getOriginalEstimate());
@@ -53,7 +50,7 @@ public class TimeTrackingTest {
   @Test
   public void testGettersAndSetters() throws Exception {
 
-    final JSONObject testJson = new JSONObject();
+    ObjectNode testJson = JsonNodeFactory.instance.objectNode();
     testJson.put("originalEstimate", "1 day");
     testJson.put("remainingEstimate", "2 days");
     testJson.put("timeSpent", "3 days");
@@ -95,7 +92,7 @@ public class TimeTrackingTest {
   @Test
   public void testTimeTrackingFromTimeTracking() throws Exception {
 
-    final JSONObject testJson = new JSONObject();
+    ObjectNode testJson = JsonNodeFactory.instance.objectNode();
     testJson.put("originalEstimate", "1 day");
     testJson.put("remainingEstimate", "2 days");
     testJson.put("timeSpent", "3 days");
@@ -126,16 +123,14 @@ public class TimeTrackingTest {
   @Test
   public void testToJSONObject() throws Exception {
 
-
-    final JSONObject testJson = new JSONObject();
+    ObjectNode testJson = JsonNodeFactory.instance.objectNode();
     testJson.put("originalEstimate", "1 day");
     testJson.put("remainingEstimate", "2 days");
     testJson.put("originalEstimateSeconds", 12);
     testJson.put("remainingEstimateSeconds", 10);
 
-
     TimeTracking timeTracking = new TimeTracking(testJson);
-    final JSONObject jsonObject = timeTracking.toJsonObject();
+    final JsonNode jsonObject = timeTracking.toJsonObject();
     assertEquals(testJson,jsonObject);
   }
 }

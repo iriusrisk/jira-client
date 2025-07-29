@@ -19,8 +19,9 @@
 
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSON;
-import net.sf.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import org.apache.http.HttpRequest;
 
@@ -72,16 +73,15 @@ public class TokenCredentials implements ICredentials {
     public void initialize(RestClient client) throws JiraException {
         if (token==null) {
             try {
-                JSONObject req = new JSONObject();
+                ObjectNode req = JsonNodeFactory.instance.objectNode();
                 req.put("username", username);
                 req.put("password", password);
-                JSON json = client.post(Resource.getAuthUri() + "session", req);
-                if (json instanceof JSONObject) {
-	                JSONObject jso = (JSONObject) json;
-	                jso = (JSONObject) jso.get("session");
-	                cookieName = (String)jso.get("name");
-	                token = (String)jso.get("value");
-	                
+                JsonNode json = client.post(Resource.getAuthUri() + "session", req);
+                if (json != null && json.isObject()) {
+                    JsonNode jso = json;
+                    jso = jso.get("session");
+                    cookieName = jso.get("name").asText();
+                    token = jso.get("value").asText();
                 }
             } catch (Exception ex) {
                 throw new JiraException("Failed to login", ex);

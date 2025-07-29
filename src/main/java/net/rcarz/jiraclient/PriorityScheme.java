@@ -3,12 +3,11 @@
  */
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSON;
-import net.sf.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Represents a priority scheme.
@@ -26,23 +25,22 @@ public class PriorityScheme extends Resource {
      * @param restclient REST client instance
      * @param json JSON payload
      */
-    public PriorityScheme(RestClient restclient, JSONObject json) {
+    private static final ObjectMapper mapper = new ObjectMapper();
+
+    public PriorityScheme(RestClient restclient, JsonNode json) {
         super(restclient);
 
         if (json != null)
             deserialise(json);
     }
 
-    public void deserialise(JSONObject json) {
-
-        Map map = json;
-
-        self = Field.getString(map.get("self"));
-        id = Field.getString(map.get("id").toString());
-        prioritiesIds = Field.getStringArray(map.get("optionIds"));
-        description = Field.getString(map.get("description"));
-        name = Field.getString(map.get("name"));
-        defaultScheme = Field.getBoolean(map.get("defaultScheme"));
+    public void deserialise(JsonNode json) {
+        self = Field.getString(json.get("self"));
+        id = Field.getString(json.get("id"));
+        prioritiesIds = Field.getStringArray(json.get("optionIds"));
+        description = Field.getString(json.get("description"));
+        name = Field.getString(json.get("name"));
+        defaultScheme = Field.getBoolean(json.get("defaultScheme"));
     }
 
     /**
@@ -58,7 +56,7 @@ public class PriorityScheme extends Resource {
     public static PriorityScheme get(RestClient restclient, String id)
             throws JiraException {
 
-        JSON result = null;
+        JsonNode result = null;
 
         try {
             result = restclient.get(getBaseUri() + "priorityschemes/" + id);
@@ -66,10 +64,11 @@ public class PriorityScheme extends Resource {
             throw new JiraException("Failed to retrieve priority " + id, ex);
         }
 
-        if (!(result instanceof JSONObject))
+        if (result == null || !result.isObject()) {
             throw new JiraException("JSON payload is malformed");
+        }
 
-        return new PriorityScheme(restclient, (JSONObject)result);
+        return new PriorityScheme(restclient, result);
     }
 
     @Override

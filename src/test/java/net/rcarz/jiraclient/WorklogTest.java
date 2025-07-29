@@ -1,23 +1,17 @@
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSONObject;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.powermock.api.mockito.PowerMockito;
-import org.powermock.modules.junit4.PowerMockRunner;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import java.text.ParsePosition;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import org.junit.Test;
+import org.powermock.api.mockito.PowerMockito;
+
 import java.util.List;
 
 import static junit.framework.Assert.assertEquals;
 import static org.mockito.Matchers.anyString;
 
-@RunWith(PowerMockRunner.class)
 public class WorklogTest {
-
-    private SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
 
     @Test(expected = JiraException.class)
     public void testJiraExceptionFromRestException() throws Exception {
@@ -33,13 +27,13 @@ public class WorklogTest {
     }
 
     @Test
-    public void testToString() throws Exception {
+    public void testToString() {
         final RestClient mockRestClient = PowerMockito.mock(RestClient.class);
-        final JSONObject mockJSONObject = new JSONObject();
+        ObjectNode mockJSONObject = JsonNodeFactory.instance.objectNode();
         String dateString = "2015-12-24";
 
         mockJSONObject.put("created",dateString);
-        final JSONObject userJSON = new JSONObject();
+        ObjectNode userJSON = JsonNodeFactory.instance.objectNode();
         userJSON.put("name","Joseph McCarthy");
         mockJSONObject.put("author", userJSON);
 

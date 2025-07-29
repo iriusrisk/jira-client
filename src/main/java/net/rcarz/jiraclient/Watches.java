@@ -19,10 +19,7 @@
 
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSON;
-import net.sf.json.JSONObject;
-
-import java.util.Map;
+import com.fasterxml.jackson.databind.JsonNode;
 
 /**
  * Represents issue watches.
@@ -39,20 +36,18 @@ public class Watches extends Resource {
      * @param restclient REST client instance
      * @param json JSON payload
      */
-    protected Watches(RestClient restclient, JSONObject json) {
+    protected Watches(RestClient restclient, JsonNode json) {
         super(restclient);
 
         if (json != null)
             deserialise(json);
     }
 
-    private void deserialise(JSONObject json) {
-        Map map = json;
-
-        self = Field.getString(map.get("self"));
-        id = Field.getString(map.get("id"));
-        watchCount = Field.getInteger(map.get("watchCount"));
-        isWatching = Field.getBoolean(map.get("isWatching"));
+    private void deserialise(JsonNode json) {
+        self = Field.getString(json.get("self"));
+        id = Field.getString(json.get("id"));
+        watchCount = Field.getInteger(json.get("watchCount"));
+        isWatching = Field.getBoolean(json.get("isWatching"));
     }
 
     /**
@@ -68,7 +63,7 @@ public class Watches extends Resource {
     public static Watches get(RestClient restclient, String issue)
         throws JiraException {
 
-        JSON result = null;
+        JsonNode result = null;
 
         try {
             result = restclient.get(getBaseUri() + "issue/" + issue + "/watches");
@@ -76,10 +71,11 @@ public class Watches extends Resource {
             throw new JiraException("Failed to retrieve watches for issue " + issue, ex);
         }
 
-        if (!(result instanceof JSONObject))
+        if (result == null || !result.isObject()) {
             throw new JiraException("JSON payload is malformed");
+        }
 
-        return new Watches(restclient, (JSONObject)result);
+        return new Watches(restclient, result);
     }
 
     @Override

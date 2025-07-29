@@ -19,9 +19,7 @@
 
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSON;
-import net.sf.json.JSONObject;
-
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -42,7 +40,7 @@ public class User extends Resource {
      * @param restclient REST client instance
      * @param json       JSON payload
      */
-    public User(RestClient restclient, JSONObject json) {
+    public User(RestClient restclient, JsonNode json) {
         super(restclient);
 
         if (json != null)
@@ -60,7 +58,7 @@ public class User extends Resource {
     public static User get(RestClient restclient, String username)
             throws JiraException {
 
-        JSON result = null;
+        JsonNode result = null;
 
         Map<String, String> params = new HashMap<String, String>();
         params.put("username", username);
@@ -71,49 +69,47 @@ public class User extends Resource {
             throw new JiraException("Failed to retrieve user " + username, ex);
         }
 
-        if (!(result instanceof JSONObject))
+        if (result == null || !result.isObject())
             throw new JiraException("JSON payload is malformed");
 
-        return new User(restclient, (JSONObject) result);
+        return new User(restclient, result);
     }
 
-    private void deserialise(JSONObject json) {
-        Map map = json;
-
-        self = Field.getString(map.get("self"));
-        id = getIdFromMap(map);
-        active = Field.getBoolean(map.get("active"));
-        avatarUrls = Field.getMap(String.class, String.class, map.get("avatarUrls"));
-        displayName = Field.getString(map.get("displayName"));
-        email = getEmailFromMap(map);
-        name = Field.getString(map.get("name"));
+    private void deserialise(JsonNode json) {
+        self = Field.getString(json.get("self"));
+        id = getIdFromJson(json);
+        active = Field.getBoolean(json.get("active"));
+        avatarUrls = Field.getMap(String.class, String.class, json.get("avatarUrls"));
+        displayName = Field.getString(json.get("displayName"));
+        email = getEmailFromJson(json);
+        name = Field.getString(json.get("name"));
     }
 
     /**
-     * API changes id might be represented as either "id" or "accountId"
+     * API changes id might be represented as either "id" or "accountId".
      *
-     * @param map JSON object for the User
+     * @param json JSON object for the User
      * @return String id of the JIRA user.
      */
-    private String getIdFromMap(Map map) {
-        if (map.containsKey("id")) {
-            return Field.getString(map.get("id"));
+    private String getIdFromJson(JsonNode json) {
+        if (json.has("id")) {
+            return Field.getString(json.get("id"));
         } else {
-            return Field.getString(map.get("accountId"));
+            return Field.getString(json.get("accountId"));
         }
     }
 
     /**
-     * API changes email address might be represented as either "email" or "emailAddress"
+     * API changes email address might be represented as either "email" or "emailAddress".
      *
-     * @param map JSON object for the User
+     * @param json JSON object for the User
      * @return String email address of the JIRA user.
      */
-    private String getEmailFromMap(Map map) {
-        if (map.containsKey("email")) {
-            return Field.getString(map.get("email"));
+    private String getEmailFromJson(JsonNode json) {
+        if (json.has("email")) {
+            return Field.getString(json.get("email"));
         } else {
-            return Field.getString(map.get("emailAddress"));
+            return Field.getString(json.get("emailAddress"));
         }
     }
 
@@ -142,4 +138,3 @@ public class User extends Resource {
         return name;
     }
 }
-

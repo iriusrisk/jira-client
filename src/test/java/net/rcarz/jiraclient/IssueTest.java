@@ -1,25 +1,23 @@
 package net.rcarz.jiraclient;
 
-import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.List;
-import java.util.Map;
-
-import net.sf.json.JSON;
-import net.sf.json.JSONNull;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.NullNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.junit.Assert;
 import org.junit.Test;
 
-import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.mock;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.List;
+import java.util.Map;
+
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 
 public class IssueTest {
 
@@ -38,12 +36,13 @@ public class IssueTest {
         String statusID = "10004";
         String description = "Issue is currently in progress.";
         String iconURL = "https://brainbubble.atlassian.net/images/icons/statuses/open.png";
+        String summary = "Maintain Company Details";
 
         Issue issue = new Issue(null, Utils.getTestIssue());
+        assertEquals(issue.getField(Field.SUMMARY), summary);
         assertNotNull(issue.getStatus());
         assertEquals(description, issue.getStatus().getDescription());
         assertEquals(iconURL, issue.getStatus().getIconUrl());
-
         assertEquals(statusName, issue.getStatus().getName());
         assertEquals(statusID, issue.getStatus().getId());
     }
@@ -150,7 +149,7 @@ public class IssueTest {
         Issue issue = new Issue(restClient, Utils.getTestIssue());
         issue.addRemoteLink("test-url", "test-title", "test-summary");
         assertEquals("/rest/api/latest/issue/FILTA-43/remotelink", restClient.postPath);
-        assertEquals("{\"object\":{\"url\":\"test-url\",\"title\":\"test-title\",\"summary\":\"test-summary\"}}", restClient.postPayload.toString(0));
+        assertEquals("{\"object\":{\"url\":\"test-url\",\"title\":\"test-title\",\"summary\":\"test-summary\"}}", restClient.postPayload.toString());
     }
 
 
@@ -182,7 +181,7 @@ public class IssueTest {
                         "\"status\":{\"resolved\":\"true\",\"icon\":" +
                             "{\"title\":\"status-title\",\"url16x16\":\"status-icon\",\"link\":\"status-url\"}" +
                 "}}}",
-                restClient.postPayload.toString(0));
+                restClient.postPayload.toString());
     }
 
     @Test
@@ -197,10 +196,52 @@ public class IssueTest {
         }
     }
 
+    @Test
+    public void testDelete() throws Exception {
+        final TestableDeleteRestClient deleteRestClient = new TestableDeleteRestClient();
+
+        Issue issue = new Issue(deleteRestClient, Utils.getTestIssue());
+
+        Assert.assertTrue(issue.delete(true));
+        Assert.assertNotNull(deleteRestClient.getLastDeleteUri());
+        Assert.assertEquals("http://localhost/dummy", deleteRestClient.getLastDeleteUri().toString());
+    }
+
+    private static class TestableDeleteRestClient extends TestableRestClient {
+        private URI lastDeleteUri = null;
+
+        public TestableDeleteRestClient() {
+            super(null);
+        }
+
+        public TestableDeleteRestClient(URI uri) {
+            super(uri);
+        }
+
+        @Override
+        public JsonNode delete(URI uri) {
+            this.lastDeleteUri = uri;
+            return null;
+        }
+
+        public URI getLastDeleteUri() {
+            return lastDeleteUri;
+        }
+
+        @Override
+        public URI buildURI(String path, Map<String, String> params) {
+            try {
+                return new URI("http://localhost/dummy");
+            } catch (URISyntaxException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
     private static class TestableRestClient extends RestClient {
 
         public String postPath = "not called";
-        public JSON postPayload = JSONNull.getInstance();
+        public JsonNode postPayload = NullNode.getInstance();
 
         public TestableRestClient() {
             super(null, null);
@@ -211,24 +252,11 @@ public class IssueTest {
         }
 
         @Override
-        public JSON post(String path, JSON payload) {
+        public JsonNode post(String path, ObjectNode payload) {
             postPath = path;
             postPayload = payload;
             return null;
         }
 
-    }
-
-    /**
-     * false is bu default so we test positive case only
-     */
-    @Test
-    public void testDelete() throws Exception {
-        RestClient restClient = mock(RestClient.class);
-        URI uri = new URI("DUMMY");
-        when(restClient.buildURI(anyString(), any(Map.class))).thenReturn(uri);
-        when(restClient.delete(eq(uri))).thenReturn(null);
-        Issue issue = new Issue(restClient, Utils.getTestIssue());
-        Assert.assertTrue(issue.delete(true));
     }
 }

@@ -3,11 +3,9 @@
  */
 package net.rcarz.jiraclient;
 
-import net.sf.json.JSON;
-import net.sf.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Represents the server info.
@@ -25,7 +23,6 @@ public class ServerInfo extends Resource {
     private String serverTitle;
 
     public static final String CLOUD = "Cloud";
-
     public static final String SERVER = "Server";
 
     /**
@@ -34,26 +31,24 @@ public class ServerInfo extends Resource {
      * @param restclient REST client instance
      * @param json JSON payload
      */
-    public ServerInfo(RestClient restclient, JSONObject json) {
+    public ServerInfo(RestClient restclient, JsonNode json) {
         super(restclient);
 
-        if (json != null)
+        if (json != null) {
             deserialise(json);
+        }
     }
 
-    public void deserialise(JSONObject json) {
-
-        Map map = json;
-
-        baseUrl = Field.getString(map.get("baseUrl"));
-        version = Field.getString(map.get("version"));
-        versionNumbers = Field.getIntegerArray(map.get("versionNumbers"));
-        deploymentType = Field.getString(map.get("deploymentType"));
-        buildNumber = Field.getInteger(map.get("buildNumber"));
-        buildDate = Field.getString(map.get("buildDate"));
-        serverTime = Field.getString(map.get("serverTime"));
-        scmInfo = Field.getString(map.get("scmInfo"));
-        serverTitle = Field.getString(map.get("serverTitle"));
+    public void deserialise(JsonNode json) {
+        baseUrl = Field.getString(json.get("baseUrl"));
+        version = Field.getString(json.get("version"));
+        versionNumbers = Field.getIntegerArray(json.get("versionNumbers"));
+        deploymentType = Field.getString(json.get("deploymentType"));
+        buildNumber = Field.getInteger(json.get("buildNumber"));
+        buildDate = Field.getString(json.get("buildDate"));
+        serverTime = Field.getString(json.get("serverTime"));
+        scmInfo = Field.getString(json.get("scmInfo"));
+        serverTitle = Field.getString(json.get("serverTitle"));
     }
 
     /**
@@ -68,7 +63,7 @@ public class ServerInfo extends Resource {
     public static ServerInfo get(RestClient restclient)
             throws JiraException {
 
-        JSON result = null;
+        JsonNode result = null;
 
         try {
             result = restclient.get(getBaseUri() + "serverInfo");
@@ -76,10 +71,11 @@ public class ServerInfo extends Resource {
             throw new JiraException("Failed to retrieve ServerInfo", ex);
         }
 
-        if (!(result instanceof JSONObject))
+        if (result == null || !result.isObject()) {
             throw new JiraException("JSON payload is malformed");
+        }
 
-        return new ServerInfo(restclient, (JSONObject)result);
+        return new ServerInfo(restclient, result);
     }
 
     @Override

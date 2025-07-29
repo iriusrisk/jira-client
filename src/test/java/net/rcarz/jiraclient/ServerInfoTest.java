@@ -23,7 +23,6 @@ public class ServerInfoTest {
     @Test
     public void prioritySchemeDataTest()
     {
-
         String baseUrl = "http://www.example.com/jira";
         String version = "8.0.0";
         List<Integer> versionNumbers = Arrays.asList(8, 0, 0);
