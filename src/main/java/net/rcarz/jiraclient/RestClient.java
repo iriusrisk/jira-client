@@ -53,6 +53,7 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Map;
+import java.util.Random;
 
 
 /**
@@ -65,6 +66,10 @@ public class RestClient {
     private URI uri = null;
     private HttpContext httpContext = null;
     private final ObjectMapper objectMapper = new ObjectMapper(); // Replacing net.sf.json with Jackson
+    private boolean enableRetryOnRateLimit = false;
+
+    private static final int MAX_RETRIES = 10;
+    private static final Random RANDOM = new Random();
 
     /**
      * Creates a REST client instance with a URI.
@@ -95,6 +100,14 @@ public class RestClient {
         this.creds = creds;
         this.uri = uri;
         this.httpContext = httpContext;
+    }
+
+    public RestClient(HttpClient httpclient, ICredentials creds, URI uri, HttpContext httpContext, boolean enableRetryOnRateLimit) {
+        this.httpClient = httpclient;
+        this.creds = creds;
+        this.uri = uri;
+        this.httpContext = httpContext;
+        this.enableRetryOnRateLimit = enableRetryOnRateLimit;
     }
 
     /**
@@ -148,18 +161,77 @@ public class RestClient {
             creds.authenticate(req);
         }
 
-        HttpResponse resp = httpClient.execute(req, ctx);
-        HttpEntity ent = resp.getEntity();
+        HttpResponse response = null;
+        int attempt = 0;
+
+        while (attempt == 0 || (enableRetryOnRateLimit && attempt < MAX_RETRIES)) {
+            response = httpClient.execute(req, ctx);
+            int status = response.getStatusLine().getStatusCode();
+            if (status == 429) {
+                long waitTime = calculateWaitTimeMillis(response, attempt);
+                try {
+                    Thread.sleep(waitTime);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            } else {
+                return handleResponse(response);
+            }
+            attempt++;
+        }
+
+        return handleResponse(response);
+    }
+
+    private long calculateWaitTimeMillis(HttpResponse response, int attempt) {
+        long jitter = RANDOM.nextInt(500); // A random extra time (up to half second) to distribute better the requests
+
+        // If we have value in Retry-After header we use exactly this value (is the direct indication from Jira) plus the jitter
+        long retryAfter = getNumericValueForHeader(response, "Retry-After");
+        if (retryAfter > 0) {
+            System.out.println("Valor de retryAfter:"+retryAfter);
+            return (retryAfter * 1000L) + jitter;
+        }
+
+        // If we don't have Retry-After, we will wait until the next interval, when new requests will be available, plus the jitter
+        long intervalSeconds = getNumericValueForHeader(response, "X-RateLimit-Interval-Seconds");
+        if (intervalSeconds > 0) {
+            System.out.println("Valor de intervalSeconds:"+intervalSeconds);
+            return (intervalSeconds * 1000L) + jitter;
+        }
+
+        // Otherwise, we wait as many seconds as retries plus the jitter
+        System.out.println("Valor defecto basado en attempts:"+attempt);
+        return (attempt * 1000L) + jitter;
+    }
+
+    private Long getNumericValueForHeader(HttpResponse response, String name) {
+        if (name == null || name.isEmpty() ) {
+            return 0L;
+        }
+        Header header = response.getFirstHeader(name);
+        if (header == null) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(header.getValue());
+        } catch(NumberFormatException ignored) {
+            return 0L;
+        }
+    }
+
+    private JsonNode handleResponse(HttpResponse response) throws RestException, IOException {
+        HttpEntity entity = response.getEntity();
         StringBuilder result = new StringBuilder();
 
-        if (ent != null) {
+        if (entity != null) {
             String encoding = null;
-            if (ent.getContentEncoding() != null) {
-                encoding = ent.getContentEncoding().getValue();
+            if (entity.getContentEncoding() != null) {
+                encoding = entity.getContentEncoding().getValue();
             }
 
             if (encoding == null) {
-                Header contentTypeHeader = resp.getFirstHeader("Content-Type");
+                Header contentTypeHeader = response.getFirstHeader("Content-Type");
                 HeaderElement[] contentTypeElements = contentTypeHeader.getElements();
                 for (HeaderElement he : contentTypeElements) {
                     NameValuePair nvp = he.getParameterByName("charset");
@@ -170,8 +242,8 @@ public class RestClient {
             }
 
             InputStreamReader isr = encoding != null ?
-                    new InputStreamReader(ent.getContent(), encoding) :
-                    new InputStreamReader(ent.getContent());
+                    new InputStreamReader(entity.getContent(), encoding) :
+                    new InputStreamReader(entity.getContent());
             BufferedReader br = new BufferedReader(isr);
             String line = "";
 
@@ -179,10 +251,10 @@ public class RestClient {
                 result.append(line);
         }
 
-        StatusLine sl = resp.getStatusLine();
+        StatusLine sl = response.getStatusLine();
 
         if (sl.getStatusCode() >= 300)
-            throw new RestException(sl.getReasonPhrase(), sl.getStatusCode(), result.toString(), resp.getAllHeaders());
+            throw new RestException(sl.getReasonPhrase(), sl.getStatusCode(), result.toString(), response.getAllHeaders());
 
         return result.length() > 0 ? objectMapper.readTree(result.toString()) : null;
     }
