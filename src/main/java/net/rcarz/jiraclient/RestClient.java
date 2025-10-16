@@ -189,19 +189,16 @@ public class RestClient {
         // If we have value in Retry-After header we use exactly this value (is the direct indication from Jira) plus the jitter
         long retryAfter = getNumericValueForHeader(response, "Retry-After");
         if (retryAfter > 0) {
-            System.out.println("Valor de retryAfter:"+retryAfter);
             return (retryAfter * 1000L) + jitter;
         }
 
         // If we don't have Retry-After, we will wait until the next interval, when new requests will be available, plus the jitter
         long intervalSeconds = getNumericValueForHeader(response, "X-RateLimit-Interval-Seconds");
         if (intervalSeconds > 0) {
-            System.out.println("Valor de intervalSeconds:"+intervalSeconds);
             return (intervalSeconds * 1000L) + jitter;
         }
 
         // Otherwise, we wait as many seconds as retries plus the jitter
-        System.out.println("Valor defecto basado en attempts:"+attempt);
         return (attempt * 1000L) + jitter;
     }
 
