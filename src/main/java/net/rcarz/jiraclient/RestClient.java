@@ -233,7 +233,7 @@ public class RestClient {
                 } catch (IOException e) {
                     String exceptionMessage = String.format("Request to uri %s, attempt %d, cause exception message: %s", req.getURI(), attempt, e.getMessage());
                     CompletableFuture<JsonNode> failedFuture = new CompletableFuture<>();
-                    failedFuture.completeExceptionally(new IOException(exceptionMessage));
+                    failedFuture.completeExceptionally(new IOException(exceptionMessage, e));
                     return failedFuture;
                 }
             } else {
