@@ -66,23 +66,14 @@ public class JiraClient {
      * @param creds      Credentials to authenticate with
      */
     public JiraClient(HttpClient httpClient, String uri, ICredentials creds) throws JiraException {
-        if (httpClient == null) {
-            PoolingClientConnectionManager connManager = new PoolingClientConnectionManager();
-            connManager.setDefaultMaxPerRoute(20);
-            connManager.setMaxTotal(40);
-            httpClient = new DefaultHttpClient(connManager);
-        }
-
-        restclient = new RestClient(httpClient, creds, URI.create(uri));
-
-        if (creds != null) {
-            username = creds.getLogonName();
-            //intialize connection if required
-            creds.initialize(restclient);
-        }
+        this(httpClient, uri, creds, null, false);
     }
 
     public JiraClient(HttpClient httpClient, String uri, ICredentials creds, HttpContext context) throws JiraException {
+        this(httpClient, uri, creds, context, false);
+    }
+
+    public JiraClient(HttpClient httpClient, String uri, ICredentials creds, HttpContext context, boolean enableRetryOnRateLimit) throws JiraException {
         if (httpClient == null) {
             PoolingClientConnectionManager connManager = new PoolingClientConnectionManager();
             connManager.setDefaultMaxPerRoute(20);
@@ -90,7 +81,7 @@ public class JiraClient {
             httpClient = new DefaultHttpClient(connManager);
         }
 
-        restclient = new RestClient(httpClient, creds, URI.create(uri), context);
+        restclient = new RestClient(httpClient, creds, URI.create(uri), context, enableRetryOnRateLimit);
 
         if (creds != null) {
             username = creds.getLogonName();
