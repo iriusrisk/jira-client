@@ -231,9 +231,9 @@ public class RestClient {
                     logger.info("Request to uri {}, attempt {} received a 429 response (Rate Limit), retry in {} ms...", req.getURI(), attempt, waitTime);
                     return scheduleRetry(req, ctx, attempt + 1, waitTime);
                 } catch (IOException e) {
-                    logger.error("Request to uri {}, attempt {}, exception message: {}", req.getURI(), attempt, e.getMessage());
+                    String exceptionMessage = String.format("Request to uri %s, attempt %d, cause exception message: %s", req.getURI(), attempt, e.getMessage());
                     CompletableFuture<JsonNode> failedFuture = new CompletableFuture<>();
-                    failedFuture.completeExceptionally(e);
+                    failedFuture.completeExceptionally(new IOException(exceptionMessage));
                     return failedFuture;
                 }
             } else {
