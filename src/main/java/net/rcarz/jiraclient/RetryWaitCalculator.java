@@ -56,10 +56,6 @@ public class RetryWaitCalculator {
         // The ceiling grows exponentially with the number of attempt
         long ceiling = (long) Math.pow(2, attempt) * base;
 
-        if (ceiling <= 0L) {
-            ceiling = 1L;
-        }
-
         // If this calculated ceiling exceeds the MAX_WAIT_TIME_MS constant, this method throws an IOException to abort
         // the retry and protect the thread from being busy too long.
         if (ceiling > MAX_WAIT_TIME_MS) {
