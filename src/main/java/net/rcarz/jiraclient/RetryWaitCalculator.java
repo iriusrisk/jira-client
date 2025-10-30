@@ -43,6 +43,11 @@ public class RetryWaitCalculator {
             }
         }
 
+        // For small bases, we prefer to space out API calls. This way, we avoid stressing Jira, and we stay more away from its rate limit.
+        if (base <= 100L) {
+            base *=2L;
+        }
+
         // The ceiling grows exponentially with the number of attempt
         long ceiling = (long) Math.pow(2, attempt) * base;
 
