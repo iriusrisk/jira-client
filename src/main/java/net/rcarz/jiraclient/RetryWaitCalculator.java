@@ -28,7 +28,7 @@ public class RetryWaitCalculator {
     public static long calculateWaitTimeMillis(HttpResponse response, int attempt) throws IOException {
         long base = 1000L;
 
-        // If we have value in Retry-After header we use exactly this value (is the direct indication from Jira) plus the jitter
+        // If we have value in Retry-After header we use exactly this value (is the direct indication from Jira)
         long retryAfter = getNumericValueForHeader(response, "Retry-After");
         if (retryAfter > 0) {
             base = retryAfter * 1000L;
