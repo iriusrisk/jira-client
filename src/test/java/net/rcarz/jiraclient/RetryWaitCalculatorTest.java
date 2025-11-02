@@ -36,10 +36,10 @@ public class RetryWaitCalculatorTest {
         response.addHeader("X-RateLimit-FillRate", "10");
 
         long waitTime = RetryWaitCalculator.calculateWaitTimeMillis(response, 3);
-        assertTrue(waitTime > 0 && waitTime <= 800L);
+        assertTrue(waitTime > 0 && waitTime <= 1600L);
 
         waitTime = RetryWaitCalculator.calculateWaitTimeMillis(response, 5);
-        assertTrue(waitTime > 0 && waitTime <= 3200L);
+        assertTrue(waitTime > 0 && waitTime <= 6400L);
     }
 
     @Test
@@ -56,7 +56,7 @@ public class RetryWaitCalculatorTest {
     }
 
     @Test
-    public void testCalculateWaitTimeMillisWithFailFast() throws IOException {
+    public void testCalculateWaitTimeMillisWithFailFast() {
 
         BasicStatusLine statusLine = new BasicStatusLine( HttpVersion.HTTP_1_1,29,"Too Many Requests");
         HttpResponse response = new BasicHttpResponse(statusLine);

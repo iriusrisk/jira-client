@@ -26,7 +26,7 @@ public class RetryWaitCalculator {
      * backoff ceiling exceeds the MAX_WAIT_TIME_MS threshold.
      */
     public static long calculateWaitTimeMillis(HttpResponse response, int attempt) throws IOException {
-        long base = 1L;
+        long base = 1000L;
 
         // If we have value in Retry-After header we use exactly this value (is the direct indication from Jira) plus the jitter
         long retryAfter = getNumericValueForHeader(response, "Retry-After");
