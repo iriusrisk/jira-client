@@ -44,6 +44,8 @@ import org.apache.http.entity.mime.content.FileBody;
 import org.apache.http.entity.mime.content.InputStreamBody;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.HttpContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -53,6 +55,13 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -60,11 +69,19 @@ import java.util.Map;
  */
 public class RestClient {
 
+    private static final Logger logger = LoggerFactory.getLogger(RestClient.class);
+
     private HttpClient httpClient = null;
     private ICredentials creds = null;
     private URI uri = null;
     private HttpContext httpContext = null;
     private final ObjectMapper objectMapper = new ObjectMapper(); // Replacing net.sf.json with Jackson
+
+    private boolean enableRetryOnRateLimit = false;
+    private static final int MAX_RETRIES = 10;
+
+    private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     /**
      * Creates a REST client instance with a URI.
@@ -95,6 +112,11 @@ public class RestClient {
         this.creds = creds;
         this.uri = uri;
         this.httpContext = httpContext;
+    }
+
+    public RestClient(HttpClient httpclient, ICredentials creds, URI uri, HttpContext httpContext, boolean enableRetryOnRateLimit) {
+        this(httpclient, creds, uri, httpContext);
+        this.enableRetryOnRateLimit = enableRetryOnRateLimit;
     }
 
     /**
@@ -148,18 +170,123 @@ public class RestClient {
             creds.authenticate(req);
         }
 
-        HttpResponse resp = httpClient.execute(req, ctx);
-        HttpEntity ent = resp.getEntity();
+        try {
+            // Launches requestAsyncInternal and wait until the CompletableFuture is completed
+            CompletableFuture<JsonNode> futureResult = requestAsyncInternal(req, ctx, 0);
+            return futureResult.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException(e);
+        } catch (ExecutionException e) {
+            Throwable cause = handleExecutionException(e);
+            throw new RuntimeException(cause);
+        }
+    }
+
+    private static Throwable handleExecutionException(ExecutionException e) throws RestException, IOException {
+        Throwable cause = e.getCause();
+
+        // If the call to httpClient.execute throws a IOException
+        if (cause instanceof CompletionException && cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+
+        // If handleResponse throws a RestException
+        if (cause instanceof RestException) {
+            throw (RestException) cause;
+        }
+
+        // If handleResponse throws a IOException
+        if (cause instanceof IOException) {
+            throw (IOException) cause;
+        }
+
+        // If there is a RuntimeException, like for example a NullPointerException
+        if (cause instanceof RuntimeException) {
+            throw (RuntimeException) cause;
+        }
+
+        // The there is an Error, like for example an OutOfMemoryError
+        return cause;
+    }
+
+    private CompletableFuture<JsonNode> requestAsyncInternal(HttpRequestBase req, HttpContext ctx, int attempt) {
+
+        // Launches the request using a thread from the executor pool
+        CompletableFuture<HttpResponse> futureResponse = CompletableFuture.supplyAsync(() -> {
+            try {
+                return httpClient.execute(req, ctx);
+            } catch (IOException e) {
+                throw new CompletionException(e);
+            }
+        }, executor);
+
+        return futureResponse.thenCompose(response -> {
+            int status = response.getStatusLine().getStatusCode();
+
+            // If the status response is a 429 (Rate Limit), we wait a time and then retry (until MAX_RETRIES at most)
+            if (status == 429 && enableRetryOnRateLimit && attempt < MAX_RETRIES) {
+                try {
+                    long waitTime = RetryWaitCalculator.calculateWaitTimeMillis(response, attempt);
+                    logger.info("Request to uri {}, attempt {} received a 429 response (Rate Limit), retry in {} ms...", req.getURI(), attempt, waitTime);
+                    return scheduleRetry(req, ctx, attempt + 1, waitTime);
+                } catch (IOException internalException) {
+                    String exceptionMessage = String.format("Request to uri %s, attempt %d. %s", req.getURI(), attempt, internalException.getMessage());
+                    CompletableFuture<JsonNode> failedFuture = new CompletableFuture<>();
+                    failedFuture.completeExceptionally(new IOException(exceptionMessage));
+                    return failedFuture;
+                }
+            } else {
+                if (attempt > 0) {
+                    logger.info("Request to URI {} finished with status {} in attempt {}", req.getURI(), status, attempt);
+                }
+                return handleResponseAndWrap(response);
+            }
+        });
+    }
+
+    private CompletableFuture<JsonNode> handleResponseAndWrap(HttpResponse response) {
+        try {
+            return CompletableFuture.completedFuture(handleResponse(response));
+        } catch (IOException | RestException e) {
+            CompletableFuture<JsonNode> failedFuture = new CompletableFuture<>();
+            failedFuture.completeExceptionally(e);
+            return failedFuture;
+        }
+    }
+
+    private CompletableFuture<JsonNode> scheduleRetry(HttpRequestBase req, HttpContext ctx, int nextAttempt, long waitTime) {
+        CompletableFuture<JsonNode> futureRetry = new CompletableFuture<>();
+
+        // Schedule a retry after 'waitTime' as an alternative to Thread.sleep to avoid blocking threads sleeping
+        scheduler.schedule(() -> {
+
+            requestAsyncInternal(req, ctx, nextAttempt)
+                    .whenComplete((result, ex) -> {
+                        if (ex != null) {
+                            futureRetry.completeExceptionally(ex);
+                        } else {
+                            futureRetry.complete(result);
+                        }
+                    });
+
+        }, waitTime, TimeUnit.MILLISECONDS);
+
+        return futureRetry;
+    }
+
+    private JsonNode handleResponse(HttpResponse response) throws RestException, IOException {
+        HttpEntity entity = response.getEntity();
         StringBuilder result = new StringBuilder();
 
-        if (ent != null) {
+        if (entity != null) {
             String encoding = null;
-            if (ent.getContentEncoding() != null) {
-                encoding = ent.getContentEncoding().getValue();
+            if (entity.getContentEncoding() != null) {
+                encoding = entity.getContentEncoding().getValue();
             }
 
             if (encoding == null) {
-                Header contentTypeHeader = resp.getFirstHeader("Content-Type");
+                Header contentTypeHeader = response.getFirstHeader("Content-Type");
                 HeaderElement[] contentTypeElements = contentTypeHeader.getElements();
                 for (HeaderElement he : contentTypeElements) {
                     NameValuePair nvp = he.getParameterByName("charset");
@@ -170,8 +297,8 @@ public class RestClient {
             }
 
             InputStreamReader isr = encoding != null ?
-                    new InputStreamReader(ent.getContent(), encoding) :
-                    new InputStreamReader(ent.getContent());
+                    new InputStreamReader(entity.getContent(), encoding) :
+                    new InputStreamReader(entity.getContent());
             BufferedReader br = new BufferedReader(isr);
             String line = "";
 
@@ -179,10 +306,10 @@ public class RestClient {
                 result.append(line);
         }
 
-        StatusLine sl = resp.getStatusLine();
+        StatusLine sl = response.getStatusLine();
 
         if (sl.getStatusCode() >= 300)
-            throw new RestException(sl.getReasonPhrase(), sl.getStatusCode(), result.toString(), resp.getAllHeaders());
+            throw new RestException(sl.getReasonPhrase(), sl.getStatusCode(), result.toString(), response.getAllHeaders());
 
         return result.length() > 0 ? objectMapper.readTree(result.toString()) : null;
     }
